@@ -9,4 +9,5 @@ COPY . .
 
 RUN mkdir -p uploads
 
-CMD gunicorn app:app --bind 0.0.0.0:$PORT
+ENV PORT=8080
+CMD gunicorn app:app --bind 0.0.0.0:${PORT}
