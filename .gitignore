@@ -1,0 +1,19 @@
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Uploads
+uploads/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# CSV data (sensitive)
+*.csv
+
+# OS
+.DS_Store

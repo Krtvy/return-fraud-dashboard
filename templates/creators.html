@@ -1,0 +1,117 @@
+{% extends "base.html" %} {% block title %}Creator Profiles — Return Fraud
+Dashboard{% endblock %} {% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">Creator Risk Profiles</h1>
+    <p class="text-slate-500 text-sm">
+      Accumulated risk scores across all analysis runs
+    </p>
+  </div>
+</div>
+
+{% if profiles %}
+<div
+  class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+>
+  <table class="min-w-full divide-y divide-slate-200">
+    <thead class="bg-slate-50">
+      <tr>
+        <th
+          class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
+        >
+          Creator
+        </th>
+        <th
+          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+        >
+          Risk Tier
+        </th>
+        <th
+          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+        >
+          MagAsha Returns
+        </th>
+        <th
+          class="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
+        >
+          Commission at Risk
+        </th>
+        <th
+          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+        >
+          Highest Score
+        </th>
+        <th
+          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+        >
+          Avg Score
+        </th>
+        <th
+          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+        >
+          Self-Buys
+        </th>
+        <th
+          class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
+        >
+          Last Updated
+        </th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for p in profiles %}
+      <tr
+        class="hover:bg-slate-50 {% if p.risk_tier == 'CRITICAL' %}risk-critical {% elif p.risk_tier == 'HIGH' %}risk-high{% endif %}"
+      >
+        <td class="px-6 py-4 text-sm font-medium text-slate-900">
+          @{{ p.creator_username }}
+        </td>
+        <td class="px-6 py-4 text-center">
+          <span
+            class="inline-block px-2 py-1 rounded text-xs font-bold
+                        badge-{{ p.risk_tier|lower }}"
+            >{{ p.risk_tier }}</span
+          >
+        </td>
+        <td class="px-6 py-4 text-center text-sm font-medium">
+          {{ p.total_mag_returns }}
+        </td>
+        <td
+          class="px-6 py-4 text-right text-sm font-mono {% if p.total_commission_at_risk > 0 %}text-red-600 font-bold{% endif %}"
+        >
+          ${{ "%.2f"|format(p.total_commission_at_risk) }}
+        </td>
+        <td class="px-6 py-4 text-center text-sm font-mono font-bold">
+          {{ p.highest_fraud_score }}
+        </td>
+        <td class="px-6 py-4 text-center text-sm font-mono">
+          {{ "%.0f"|format(p.avg_fraud_score) }}
+        </td>
+        <td class="px-6 py-4 text-center">
+          {% if p.self_buy_count > 0 %}
+          <span
+            class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-bold"
+            >{{ p.self_buy_count }}</span
+          >
+          {% else %}
+          <span class="text-slate-400">0</span>
+          {% endif %}
+        </td>
+        <td class="px-6 py-4 text-sm text-slate-500">
+          {{ p.last_updated[:16] if p.last_updated else '—' }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div
+  class="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center"
+>
+  <p class="text-slate-400 text-lg">No creator profiles yet.</p>
+  <p class="text-slate-400 text-sm mt-2">
+    Profiles build up automatically after each analysis run.
+  </p>
+</div>
+{% endif %} {% endblock %}

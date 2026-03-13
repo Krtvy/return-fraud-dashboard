@@ -1,0 +1,227 @@
+{% extends "base.html" %} {% block title %}Daily Stats — Run #{{ run.id }}{%
+endblock %} {% block content %}
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">Daily Statistics</h1>
+    <p class="text-slate-500 text-sm">
+      Run #{{ run.id }} — {{ run.run_date[:16] }} — MagAsha affiliate orders per
+      day
+    </p>
+  </div>
+  <a
+    href="/"
+    class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800"
+    >New Analysis</a
+  >
+</div>
+
+<div class="flex space-x-1 mb-6 bg-slate-100 rounded-lg p-1 w-fit">
+  <a
+    href="/results/{{ run.id }}"
+    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
+    >All Returns</a
+  >
+  <a
+    href="/users/{{ run.id }}"
+    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
+    >User Level</a
+  >
+  <a
+    href="/addresses/{{ run.id }}"
+    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
+    >Address Level</a
+  >
+  <a
+    href="/creator-data/{{ run.id }}"
+    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
+    >Creator Level</a
+  >
+  <a
+    href="/stats/{{ run.id }}"
+    class="px-4 py-2 rounded-md text-sm font-medium bg-white text-slate-900 shadow-sm"
+    >Daily Stats</a
+  >
+</div>
+
+{% if daily %}
+<!-- Summary -->
+{% set total_orders = daily|sum(attribute='orders') %} {% set total_returns =
+daily|sum(attribute='returns') %} {% set total_refund =
+daily|sum(attribute='refund') %} {% set max_orders =
+daily|map(attribute='orders')|max %}
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+  <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
+    <div class="text-2xl font-bold text-slate-900">{{ daily|length }}</div>
+    <div class="text-xs text-slate-500 mt-1">Days of Data</div>
+  </div>
+  <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
+    <div class="text-2xl font-bold text-blue-600">{{ total_orders }}</div>
+    <div class="text-xs text-slate-500 mt-1">Total MagAsha Orders</div>
+  </div>
+  <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
+    <div class="text-2xl font-bold text-red-600">{{ total_returns }}</div>
+    <div class="text-xs text-slate-500 mt-1">Total Returns Filed</div>
+  </div>
+  <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
+    <div class="text-2xl font-bold text-slate-900">
+      {{ "%.1f"|format(total_orders / daily|length) }}
+    </div>
+    <div class="text-xs text-slate-500 mt-1">Avg Orders/Day</div>
+  </div>
+  <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
+    <div class="text-2xl font-bold text-red-600">
+      ${{ "%.0f"|format(total_refund) }}
+    </div>
+    <div class="text-xs text-slate-500 mt-1">Total Return $</div>
+  </div>
+</div>
+
+<!-- Visual Chart -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+  <h3 class="font-semibold text-slate-900 mb-4">Orders vs Returns per Day</h3>
+  <div class="space-y-2">
+    {% for d in daily %}
+    <div class="flex items-center text-xs">
+      <span class="w-20 text-slate-500 font-mono shrink-0"
+        >{{ d.date[5:] }}</span
+      >
+      <div class="flex-1 flex items-center gap-2">
+        <!-- Orders bar (blue) -->
+        <div class="flex items-center gap-1 flex-1">
+          <div
+            class="bg-blue-400 rounded-sm h-5 transition-all"
+            style="width: {{ (d.orders / max_orders * 100) if max_orders > 0 else 0 }}%"
+          ></div>
+          <span class="text-blue-700 font-medium shrink-0">{{ d.orders }}</span>
+        </div>
+        <!-- Returns bar (red) -->
+        {% if d.returns > 0 %}
+        <div class="flex items-center gap-1" style="width: 120px">
+          <div
+            class="bg-red-400 rounded-sm h-5"
+            style="width: {{ (d.returns / (daily|map(attribute='returns')|max or 1) * 80) }}%"
+          ></div>
+          <span class="text-red-700 font-medium shrink-0">{{ d.returns }}</span>
+        </div>
+        {% else %}
+        <div style="width: 120px"></div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="flex gap-6 mt-4 text-xs text-slate-500">
+    <span
+      ><span class="inline-block w-3 h-3 bg-blue-400 rounded-sm mr-1"></span
+      >Orders</span
+    >
+    <span
+      ><span class="inline-block w-3 h-3 bg-red-400 rounded-sm mr-1"></span
+      >Returns</span
+    >
+  </div>
+</div>
+
+<!-- Data Table -->
+<div
+  class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+>
+  <table class="min-w-full divide-y divide-slate-200">
+    <thead class="bg-slate-50">
+      <tr>
+        <th
+          class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
+        >
+          Date
+        </th>
+        <th
+          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+        >
+          MagAsha Orders
+        </th>
+        <th
+          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+        >
+          Returns Filed
+        </th>
+        <th
+          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+        >
+          Return Rate
+        </th>
+        <th
+          class="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
+        >
+          Return $
+        </th>
+        <th
+          class="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
+        >
+          Commission Risk
+        </th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for d in daily %}
+      <tr class="hover:bg-slate-50 {% if d.returns > 0 %}bg-red-50{% endif %}">
+        <td class="px-6 py-3 text-sm font-mono font-medium">{{ d.date }}</td>
+        <td class="px-6 py-3 text-sm text-center font-bold text-blue-600">
+          {{ d.orders }}
+        </td>
+        <td
+          class="px-6 py-3 text-sm text-center {% if d.returns > 0 %}font-bold text-red-600{% else %}text-slate-400{% endif %}"
+        >
+          {{ d.returns }}
+        </td>
+        <td
+          class="px-6 py-3 text-sm text-center {% if d.orders > 0 and d.returns / d.orders > 0.05 %}text-red-600 font-bold{% endif %}"
+        >
+          {% if d.orders > 0 %}{{ "%.1f"|format(d.returns / d.orders * 100)
+          }}%{% else %}—{% endif %}
+        </td>
+        <td
+          class="px-6 py-3 text-sm text-right font-mono {% if d.refund > 0 %}text-red-600{% endif %}"
+        >
+          {% if d.refund > 0 %}${{ "%.2f"|format(d.refund) }}{% else %}—{% endif
+          %}
+        </td>
+        <td
+          class="px-6 py-3 text-sm text-right font-mono {% if d.commission > 0 %}text-red-600 font-bold{% endif %}"
+        >
+          {% if d.commission > 0 %}${{ "%.2f"|format(d.commission) }}{% else
+          %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      <!-- Totals row -->
+      <tr class="bg-slate-100 font-bold">
+        <td class="px-6 py-3 text-sm">TOTAL</td>
+        <td class="px-6 py-3 text-sm text-center text-blue-600">
+          {{ total_orders }}
+        </td>
+        <td class="px-6 py-3 text-sm text-center text-red-600">
+          {{ total_returns }}
+        </td>
+        <td class="px-6 py-3 text-sm text-center">
+          {% if total_orders > 0 %}{{ "%.1f"|format(total_returns / total_orders
+          * 100) }}%{% endif %}
+        </td>
+        <td class="px-6 py-3 text-sm text-right text-red-600 font-mono">
+          ${{ "%.2f"|format(total_refund) }}
+        </td>
+        <td class="px-6 py-3 text-sm text-right text-red-600 font-mono">
+          ${{ "%.2f"|format(daily|sum(attribute='commission')) }}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+{% else %}
+<div
+  class="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center"
+>
+  <p class="text-slate-400">No daily statistics available for this run.</p>
+</div>
+{% endif %} {% endblock %}

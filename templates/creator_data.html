@@ -1,0 +1,183 @@
+{% extends "base.html" %} {% block title %}Creator Level — Run #{{ run.id }}{%
+endblock %} {% block content %}
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">Creator Level Data</h1>
+    <p class="text-slate-500 text-sm">
+      Run #{{ run.id }} — {{ run.run_date[:16] }} — Aggregated by affiliate
+      creator
+    </p>
+  </div>
+  <a
+    href="/"
+    class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800"
+    >New Analysis</a
+  >
+</div>
+
+<div class="flex space-x-1 mb-6 bg-slate-100 rounded-lg p-1 w-fit">
+  <a
+    href="/results/{{ run.id }}"
+    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
+    >All Returns</a
+  >
+  <a
+    href="/users/{{ run.id }}"
+    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
+    >User Level</a
+  >
+  <a
+    href="/addresses/{{ run.id }}"
+    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
+    >Address Level</a
+  >
+  <a
+    href="/creator-data/{{ run.id }}"
+    class="px-4 py-2 rounded-md text-sm font-medium bg-white text-slate-900 shadow-sm"
+    >Creator Level</a
+  >
+  <a
+    href="/stats/{{ run.id }}"
+    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
+    >Daily Stats</a
+  >
+</div>
+
+<p class="text-sm text-slate-500 mb-4">
+  {{ rows|length }} creators with MagAsha affiliate returns
+</p>
+
+<div
+  class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+>
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-slate-200">
+      <thead class="bg-slate-50">
+        <tr>
+          <th
+            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
+          >
+            Creator
+          </th>
+          <th
+            class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+          >
+            Unique Buyers
+          </th>
+          <th
+            class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+          >
+            Return Orders
+          </th>
+          <th
+            class="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
+          >
+            Refund $
+          </th>
+          <th
+            class="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
+          >
+            Commission at Risk
+          </th>
+          <th
+            class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+          >
+            Max Score
+          </th>
+          <th
+            class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
+          >
+            Avg Score
+          </th>
+          <th
+            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
+          >
+            Alerts
+          </th>
+          <th
+            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
+          >
+            Commission Paid?
+          </th>
+          <th
+            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
+          >
+            Buyers
+          </th>
+          <th
+            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
+          >
+            States
+          </th>
+          <th
+            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
+          >
+            Reasons
+          </th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for r in rows %}
+        <tr
+          class="hover:bg-slate-50 {% if r.has_self_buy %}risk-critical {% elif r.max_score >= 60 %}risk-critical {% elif r.max_score >= 40 %}risk-high{% endif %}"
+        >
+          <td class="px-4 py-3 text-sm font-medium text-slate-900">
+            @{{ r.creator }}
+          </td>
+          <td class="px-4 py-3 text-sm text-center">{{ r.unique_buyers }}</td>
+          <td class="px-4 py-3 text-sm text-center font-bold">
+            {{ r.unique_orders }}
+          </td>
+          <td class="px-4 py-3 text-sm text-right font-mono">
+            ${{ "%.2f"|format(r.total_refund) }}
+          </td>
+          <td
+            class="px-4 py-3 text-sm text-right font-mono font-bold text-red-600"
+          >
+            ${{ "%.2f"|format(r.total_commission) }}
+          </td>
+          <td class="px-4 py-3 text-center">
+            <span
+              class="inline-block px-2 py-1 rounded text-xs font-bold {% if r.max_score >= 60 %}badge-critical {% elif r.max_score >= 40 %}badge-high {% elif r.max_score >= 20 %}badge-medium {% else %}badge-low{% endif %}"
+              >{{ r.max_score }}</span
+            >
+          </td>
+          <td class="px-4 py-3 text-sm text-center font-mono">
+            {{ r.avg_score }}
+          </td>
+          <td class="px-4 py-3 text-xs">
+            {% if r.has_self_buy %}
+            <span class="flag-tag bg-red-100 text-red-800">SELF-BUY</span>
+            {% endif %} {% if r.return_count > r.unique_orders %}
+            <span class="flag-tag bg-amber-100 text-amber-800"
+              >DUPLICATE RETURNS</span
+            >
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-xs">
+            {% if r.commission_paid == 'YES' %}
+            <span class="font-bold text-red-600">YES — AT RISK</span>
+            {% else %}
+            <span class="text-green-600">No</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-xs text-slate-600">
+            {% for b in (r.buyers or '').split(',')[:3] if b %}
+            <span class="block">@{{ b.strip() }}</span>
+            {% endfor %}
+          </td>
+          <td class="px-4 py-3 text-xs text-slate-500">
+            {{ (r.states or '').replace(',', ', ') }}
+          </td>
+          <td class="px-4 py-3 text-xs text-slate-500">
+            {% for reason in (r.reasons or '').split(',')[:2] %}
+            <span class="block">{{ reason.strip() }}</span>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

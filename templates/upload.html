@@ -1,0 +1,202 @@
+{% extends "base.html" %} {% block title %}Upload — Return Fraud Dashboard{%
+endblock %} {% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <!-- Upload Card -->
+  <div class="lg:col-span-2">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+      <h2 class="text-2xl font-bold text-slate-900 mb-2">Analyze Returns</h2>
+      <p class="text-slate-500 mb-6">
+        Upload your 3 TikTok raw CSV exports to detect fraudulent MagAsha
+        returns.
+      </p>
+
+      <form
+        action="/upload"
+        method="POST"
+        enctype="multipart/form-data"
+        id="uploadForm"
+      >
+        <div class="space-y-5">
+          <!-- Return Raw -->
+          <div
+            class="border-2 border-dashed border-slate-300 rounded-lg p-5 hover:border-red-400 transition-colors"
+          >
+            <label class="block text-sm font-semibold text-slate-700 mb-2">
+              1. Return Raw CSV
+              <span class="text-slate-400 font-normal ml-2"
+                >TikTok Seller Center &rarr; Returns</span
+              >
+            </label>
+            <input
+              type="file"
+              name="return_raw"
+              accept=".csv"
+              required
+              class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100 cursor-pointer"
+            />
+          </div>
+
+          <!-- Affiliate Raw -->
+          <div
+            class="border-2 border-dashed border-slate-300 rounded-lg p-5 hover:border-orange-400 transition-colors"
+          >
+            <label class="block text-sm font-semibold text-slate-700 mb-2">
+              2. Affiliate Raw CSV
+              <span class="text-slate-400 font-normal ml-2"
+                >TikTok Affiliate Center &rarr; Orders</span
+              >
+            </label>
+            <input
+              type="file"
+              name="affiliate_raw"
+              accept=".csv"
+              required
+              class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 cursor-pointer"
+            />
+          </div>
+
+          <!-- All Orders Raw -->
+          <div
+            class="border-2 border-dashed border-slate-300 rounded-lg p-5 hover:border-blue-400 transition-colors"
+          >
+            <label class="block text-sm font-semibold text-slate-700 mb-2">
+              3. All Orders Raw CSV
+              <span class="text-slate-400 font-normal ml-2"
+                >TikTok Seller Center &rarr; All Orders</span
+              >
+            </label>
+            <input
+              type="file"
+              name="all_orders_raw"
+              accept=".csv"
+              required
+              class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          id="submitBtn"
+          class="mt-6 w-full bg-slate-900 text-white py-3 px-6 rounded-lg font-semibold hover:bg-slate-800 transition-colors text-lg"
+        >
+          Analyze Returns
+        </button>
+      </form>
+
+      <!-- Loading overlay -->
+      <div
+        id="loadingOverlay"
+        class="hidden mt-4 p-6 bg-slate-50 rounded-lg text-center"
+      >
+        <div
+          class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-slate-300 border-t-red-500 mb-3"
+        ></div>
+        <p class="text-slate-600 font-medium">
+          Processing CSVs... Analyzing 16 fraud rules...
+        </p>
+        <p class="text-slate-400 text-sm mt-1">
+          This may take 15-30 seconds for large files
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Stats Sidebar -->
+  <div class="space-y-4">
+    {% if dash and dash.recent_runs %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <h3 class="font-semibold text-slate-900 mb-3">Latest Run</h3>
+      {% set last = dash.recent_runs[0] %}
+      <div class="space-y-3">
+        <div class="flex justify-between text-sm">
+          <span class="text-slate-500">Date</span>
+          <span class="font-medium">{{ last.run_date[:16] }}</span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-slate-500">MagAsha Returns</span>
+          <span class="font-medium">{{ last.mag_returns }}</span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-slate-500">Critical</span>
+          <span class="font-bold text-red-600">{{ last.critical_count }}</span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-slate-500">High</span>
+          <span class="font-bold text-orange-600">{{ last.high_count }}</span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-slate-500">At-Risk $</span>
+          <span class="font-bold text-red-600"
+            >${{ "%.2f"|format(last.at_risk_refund) }}</span
+          >
+        </div>
+        <a
+          href="/results/{{ last.id }}"
+          class="block mt-3 text-center text-sm font-medium text-red-600 hover:text-red-800"
+        >
+          View Results &rarr;
+        </a>
+      </div>
+    </div>
+    {% endif %} {% if dash and dash.pending_critical_high > 0 %}
+    <div class="bg-red-50 rounded-xl border border-red-200 p-6">
+      <h3 class="font-semibold text-red-900 mb-2">Pending Review</h3>
+      <p class="text-3xl font-bold text-red-600">
+        {{ dash.pending_critical_high }}
+      </p>
+      <p class="text-sm text-red-700 mt-1">
+        CRITICAL + HIGH returns awaiting your decision
+      </p>
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <h3 class="font-semibold text-slate-900 mb-3">Detection Rules</h3>
+      <div class="space-y-2 text-xs text-slate-600">
+        <div class="flex justify-between">
+          <span>Self-Buy Detection</span><span class="font-mono">+40</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Commission Already Paid</span><span class="font-mono">+25</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Sock Puppet (Phone)</span><span class="font-mono">+30</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Sock Puppet (Name)</span><span class="font-mono">+20</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Buyer Return Rate >50%</span><span class="font-mono">+25</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Repeat Returner</span><span class="font-mono">+20</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Creator Return Rate >10%</span
+          ><span class="font-mono">+20</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Return After 14d Window</span><span class="font-mono">+30</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Duplicate Return</span><span class="font-mono">+25</span>
+        </div>
+        <div class="flex justify-between">
+          <span>+ 7 more rules</span><span class="font-mono">...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %} {% block scripts %}
+<script>
+  document.getElementById("uploadForm").addEventListener("submit", function () {
+    document.getElementById("submitBtn").disabled = true;
+    document.getElementById("submitBtn").textContent = "Processing...";
+    document.getElementById("submitBtn").classList.add("opacity-50");
+    document.getElementById("loadingOverlay").classList.remove("hidden");
+  });
+</script>
+{% endblock %}
