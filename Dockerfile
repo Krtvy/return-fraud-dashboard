@@ -10,4 +10,5 @@ COPY . .
 RUN mkdir -p uploads
 
 ENV PORT=8080
-CMD gunicorn app:app --bind 0.0.0.0:${PORT}
+EXPOSE 8080
+CMD ["/bin/sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT}"]
