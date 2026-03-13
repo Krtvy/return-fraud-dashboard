@@ -1,0 +1,10 @@
+*.db
+*.db-shm
+*.db-wal
+*.csv
+__pycache__
+.git
+.DS_Store
+uploads/
+nixpacks.toml
+render.yaml
