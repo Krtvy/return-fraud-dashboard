@@ -1,0 +1,357 @@
+{% extends "base.html" %} {% block title %}Overview — Run #{{ run.id }}{%
+endblock %} {% block content %}
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-2xl font-bold text-brand-dark">Top-Down Overview</h1>
+    <p class="text-brand-sage text-sm">
+      Run #{{ run.id }} — {{ run.run_date[:16] }} — MagAsha affiliate 30-day
+      snapshot
+    </p>
+  </div>
+  <a href="/" class="btn btn-primary btn-sm">New Analysis</a>
+</div>
+
+<div role="tablist" class="tabs tabs-bordered mb-6">
+  <a href="/overview/{{ run.id }}" role="tab" class="tab tab-active"
+    >Overview</a
+  >
+  <a href="/results/{{ run.id }}" role="tab" class="tab">All Returns</a>
+  <a href="/users/{{ run.id }}" role="tab" class="tab">User Level</a>
+  <a href="/addresses/{{ run.id }}" role="tab" class="tab">Address Level</a>
+  <a href="/creator-data/{{ run.id }}" role="tab" class="tab">Creator Level</a>
+  <a href="/stats/{{ run.id }}" role="tab" class="tab">Daily Stats</a>
+</div>
+
+<!-- SUMMARY CARDS -->
+<div
+  class="stats stats-horizontal w-full shadow-sm border border-base-300 mb-8 flex-wrap"
+>
+  <div class="stat text-center">
+    <div class="stat-title">Days of Data</div>
+    <div class="stat-value text-brand-dark num">
+      {{ data.summary.days_of_data }}
+    </div>
+  </div>
+  <div class="stat text-center">
+    <div class="stat-title">Total Orders</div>
+    <div class="stat-value text-brand-green num">
+      {{ data.summary.total_orders }}
+    </div>
+  </div>
+  <div class="stat text-center">
+    <div class="stat-title">Total Returns</div>
+    <div class="stat-value text-red-600 num">
+      {{ data.summary.total_refunds }}
+    </div>
+  </div>
+  <div class="stat text-center">
+    <div class="stat-title">Return Rate</div>
+    <div class="stat-value text-red-600 num">
+      {{ data.summary.total_refund_rate }}
+    </div>
+  </div>
+  <div class="stat text-center">
+    <div class="stat-title">Avg Daily Return %</div>
+    <div class="stat-value text-brand-dark num">
+      {{ data.summary.avg_daily_return_pct }}
+    </div>
+  </div>
+  <div class="stat text-center">
+    <div class="stat-title">Top State</div>
+    <div class="stat-value text-brand-dark">{{ data.summary.top_state }}</div>
+  </div>
+  <div class="stat text-center">
+    <div class="stat-title">Top State %</div>
+    <div class="stat-value text-brand-dark num">
+      {{ data.summary.top_state_pct }}
+    </div>
+  </div>
+</div>
+
+<!-- BENCHMARKS ROW -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+  <!-- User Benchmarks -->
+  <div class="card bg-base-100 shadow-sm border border-base-300 p-6">
+    <h3 class="section-label mb-4">User Level Benchmarks</h3>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <div class="text-xs text-brand-sage">Avg Refund %</div>
+        <div class="text-xl font-bold text-brand-dark num">
+          {{ data.user_bench.avg_refund_pct }}
+        </div>
+      </div>
+      <div>
+        <div class="text-xs text-brand-sage">99th %ile Refund %</div>
+        <div class="text-xl font-bold text-red-600 num">
+          {{ data.user_bench.p99_refund_pct }}
+        </div>
+      </div>
+      <div>
+        <div class="text-xs text-brand-sage">Users Above Avg</div>
+        <div class="text-xl font-bold text-brand-dark num">
+          {{ data.user_bench.above_avg }}
+        </div>
+      </div>
+      <div>
+        <div class="text-xs text-brand-sage">Users Above 99th %ile</div>
+        <div
+          class="text-xl font-bold num {% if data.user_bench.above_p99 != '0' %}text-red-600{% else %}text-brand-green{% endif %}"
+        >
+          {{ data.user_bench.above_p99 }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Creator Benchmarks -->
+  <div class="card bg-base-100 shadow-sm border border-base-300 p-6">
+    <h3 class="section-label mb-4">Creator Level Benchmarks</h3>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <div class="text-xs text-brand-sage">Avg Refund %</div>
+        <div class="text-xl font-bold text-brand-dark num">
+          {{ data.creator_bench.avg_refund_pct }}
+        </div>
+      </div>
+      <div>
+        <div class="text-xs text-brand-sage">99th %ile Refund %</div>
+        <div class="text-xl font-bold text-red-600 num">
+          {{ data.creator_bench.p99_refund_pct }}
+        </div>
+      </div>
+      <div>
+        <div class="text-xs text-brand-sage">Creators Above Avg</div>
+        <div class="text-xl font-bold text-brand-dark num">
+          {{ data.creator_bench.above_avg }}
+        </div>
+      </div>
+      <div>
+        <div class="text-xs text-brand-sage">Creators Above 95th %ile</div>
+        <div
+          class="text-xl font-bold num {% if data.creator_bench.above_p95 != '0' %}text-red-600{% else %}text-brand-green{% endif %}"
+        >
+          {{ data.creator_bench.above_p95 }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DAILY TRACKER CHART -->
+<div class="card bg-base-100 shadow-sm border border-base-300 p-6 mb-8">
+  <h3 class="section-label mb-4">Daily Order & Return Tracker</h3>
+  {% set max_orders = data.daily|map(attribute='orders')|max %}
+  <div class="space-y-1.5">
+    {% for d in data.daily %}
+    <div class="flex items-center text-xs">
+      <span class="w-16 text-brand-sage num shrink-0">{{ d.date }}</span>
+      <div class="flex-1 flex items-center gap-2">
+        <div class="flex items-center gap-1 flex-1">
+          <div
+            class="bg-brand-green rounded-sm h-5 transition-all"
+            style="width: {{ (d.orders / max_orders * 100) if max_orders > 0 else 0 }}%"
+          ></div>
+          <span class="text-brand-green font-semibold shrink-0 num"
+            >{{ d.orders }}</span
+          >
+        </div>
+        {% if d.refunds > 0 %}
+        <div class="flex items-center gap-1" style="width: 100px">
+          <div
+            class="bg-red-400 rounded-sm h-5"
+            style="width: {{ (d.refunds / (data.daily|map(attribute='refunds')|max or 1) * 80) }}%"
+          ></div>
+          <span class="text-red-600 font-semibold shrink-0 num"
+            >{{ d.refunds }}</span
+          >
+        </div>
+        {% else %}
+        <div style="width: 100px"></div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="flex gap-6 mt-4 text-xs text-brand-sage">
+    <span
+      ><span class="inline-block w-3 h-3 bg-brand-green rounded-sm mr-1"></span
+      >Orders</span
+    >
+    <span
+      ><span class="inline-block w-3 h-3 bg-red-400 rounded-sm mr-1"></span
+      >Returns</span
+    >
+  </div>
+</div>
+
+<!-- DAILY DETAIL TABLE -->
+<div
+  class="card bg-base-100 shadow-sm border border-base-300 overflow-hidden mb-8"
+>
+  <div class="px-6 pt-5 pb-3">
+    <h3 class="section-label">Daily Metrics Detail</h3>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="table table-sm min-w-full">
+      <thead>
+        <tr>
+          <th class="text-left">Date</th>
+          <th class="text-center">Orders</th>
+          <th class="text-center">Returns</th>
+          <th class="text-center">Return Rate</th>
+          <th class="text-center">Addr Conc. %</th>
+          <th class="text-left">Top State</th>
+          <th class="text-center">Avg Ord/Addr</th>
+          <th class="text-center">Max Qty/Addr</th>
+          <th class="text-left">Anomaly States</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in data.daily %}
+        <tr class="{% if d.refunds > 0 %}bg-red-50/50{% endif %}">
+          <td class="text-sm num font-medium text-brand-dark">{{ d.date }}</td>
+          <td class="text-sm text-center font-semibold text-brand-green num">
+            {{ d.orders }}
+          </td>
+          <td
+            class="text-sm text-center num {% if d.refunds > 0 %}font-bold text-red-600{% else %}text-brand-sage{% endif %}"
+          >
+            {{ d.refunds }}
+          </td>
+          <td
+            class="text-sm text-center num {% if d.refund_rate and d.refund_rate != '0.0%' %}text-red-600{% else %}text-brand-sage{% endif %}"
+          >
+            {{ d.refund_rate or '—' }}
+          </td>
+          <td class="text-sm text-center text-brand-sage num">
+            {{ d.addr_concentration or '—' }}
+          </td>
+          <td class="text-xs text-brand-sage">{{ d.top_state or '—' }}</td>
+          <td class="text-sm text-center num text-brand-sage">
+            {{ d.avg_order_per_addr or '—' }}
+          </td>
+          <td
+            class="text-sm text-center num {% if d.max_qty_per_addr|int > 2 %}text-red-600 font-bold{% else %}text-brand-sage{% endif %}"
+          >
+            {{ d.max_qty_per_addr or '—' }}
+          </td>
+          <td class="text-xs text-brand-sage">
+            {{ d.anomaly_states if d.anomaly_states and d.anomaly_states !=
+            '#N/A' else '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TOP CREATORS & USERS WITH RETURNS -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+  <!-- Top Creators with Returns -->
+  <div
+    class="card bg-base-100 shadow-sm border border-base-300 overflow-hidden"
+  >
+    <div class="px-6 pt-5 pb-3">
+      <h3 class="section-label">
+        Creators with Returns
+        <span class="text-brand-sage font-normal normal-case ml-2"
+          >({{ data.creators_with_returns|length }} of {{ data.creators|length
+          }})</span
+        >
+      </h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="table table-sm min-w-full">
+        <thead>
+          <tr>
+            <th class="text-left">Creator</th>
+            <th class="text-center">Orders</th>
+            <th class="text-center">Returns</th>
+            <th class="text-center">Return %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in data.creators_with_returns %}
+          <tr>
+            <td class="text-sm font-medium text-brand-dark">
+              @{{ c.username }}
+            </td>
+            <td class="text-sm text-center text-brand-sage num">
+              {{ c.orders }}
+            </td>
+            <td class="text-sm text-center font-bold text-red-600 num">
+              {{ c.returns }}
+            </td>
+            <td class="text-sm text-center">
+              <span
+                class="num {% if c.return_pct and c.return_pct.replace('%','')|float > 5 %}text-red-600 font-bold{% else %}text-brand-sage{% endif %}"
+              >
+                {{ c.return_pct }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Top Users with Returns -->
+  <div
+    class="card bg-base-100 shadow-sm border border-base-300 overflow-hidden"
+  >
+    <div class="px-6 pt-5 pb-3">
+      <h3 class="section-label">
+        Users with Returns
+        <span class="text-brand-sage font-normal normal-case ml-2"
+          >({{ data.users_with_returns|length }} of {{ data.users|length
+          }})</span
+        >
+      </h3>
+    </div>
+    <div class="overflow-x-auto" style="max-height: 500px; overflow-y: auto">
+      <table class="table table-sm min-w-full">
+        <thead class="sticky top-0">
+          <tr>
+            <th class="text-left">User</th>
+            <th class="text-center">Orders</th>
+            <th class="text-center">Returns</th>
+            <th class="text-center">Return %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in data.users_with_returns[:50] %}
+          <tr>
+            <td class="text-sm font-medium text-brand-dark">
+              @{{ u.username }}
+            </td>
+            <td class="text-sm text-center text-brand-sage num">
+              {{ u.orders }}
+            </td>
+            <td class="text-sm text-center font-bold text-red-600 num">
+              {{ u.returns }}
+            </td>
+            <td class="text-sm text-center">
+              <span
+                class="num {% if u.return_pct and u.return_pct.replace('%','')|float > 50 %}text-red-600 font-bold{% else %}text-brand-sage{% endif %}"
+              >
+                {{ u.return_pct }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %} {% if data.users_with_returns|length > 50 %}
+          <tr>
+            <td colspan="4" class="text-center text-brand-sage text-sm py-3">
+              + {{ data.users_with_returns|length - 50 }} more users with
+              returns
+            </td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -5,6 +5,7 @@ Stores history, creator profiles, and approve/reject decisions.
 
 import sqlite3
 import os
+import json
 from datetime import datetime
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fraud_dashboard.db")
@@ -100,6 +101,13 @@ def init_db():
         returns INTEGER DEFAULT 0,
         refund REAL DEFAULT 0,
         commission REAL DEFAULT 0,
+        FOREIGN KEY (run_id) REFERENCES runs(id)
+    )""")
+
+    c.execute("""CREATE TABLE IF NOT EXISTS overview_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL,
+        data_json TEXT NOT NULL,
         FOREIGN KEY (run_id) REFERENCES runs(id)
     )""")
 
@@ -267,7 +275,80 @@ def get_results(run_id, risk_filter=None, action_filter=None):
     query += " ORDER BY fraud_score DESC"
     rows = conn.execute(query, params).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+
+    # Group by order_id — merge duplicates into one row
+    from collections import OrderedDict
+    order_groups = OrderedDict()
+    for r in rows:
+        d = dict(r)
+        oid = d["order_id"]
+        if oid not in order_groups:
+            d["order_dupe_count"] = 1
+            d["sub_returns"] = []
+            order_groups[oid] = d
+        else:
+            order_groups[oid]["order_dupe_count"] += 1
+            # Merge: keep highest score row as primary, collect others as sub_returns
+            primary = order_groups[oid]
+            sub = d
+            if d["fraud_score"] > primary["fraud_score"]:
+                # Swap — new row becomes primary
+                old_primary = {k: v for k, v in primary.items() if k not in ("order_dupe_count", "sub_returns")}
+                primary["sub_returns"].append(old_primary)
+                for k, v in d.items():
+                    if k not in ("order_dupe_count", "sub_returns"):
+                        primary[k] = v
+            else:
+                primary["sub_returns"].append(sub)
+            # Combine refund/commission totals
+            primary["combined_refund"] = primary.get("combined_refund", primary["refund_amount"])
+            primary["combined_refund"] += sub["refund_amount"] if d["fraud_score"] <= primary["fraud_score"] else 0
+            primary["combined_commission"] = primary.get("combined_commission", primary["commission_at_risk"])
+            primary["combined_commission"] += sub["commission_at_risk"] if d["fraud_score"] <= primary["fraud_score"] else 0
+            # Merge reasons
+            if sub["return_reason"] != primary["return_reason"]:
+                primary["merged_reasons"] = primary.get("merged_reasons", primary["return_reason"])
+                primary["merged_reasons"] += " + " + sub["return_reason"]
+            # Merge statuses
+            if sub["return_status"] != primary["return_status"]:
+                primary["merged_statuses"] = primary.get("merged_statuses", primary["return_status"])
+                primary["merged_statuses"] += " / " + sub["return_status"]
+
+    # Finalize: set combined values for single rows too
+    results = []
+    for row in order_groups.values():
+        if "combined_refund" not in row:
+            row["combined_refund"] = row["refund_amount"]
+        if "combined_commission" not in row:
+            row["combined_commission"] = row["commission_at_risk"]
+        if "merged_reasons" not in row:
+            row["merged_reasons"] = row["return_reason"]
+        if "merged_statuses" not in row:
+            row["merged_statuses"] = row["return_status"]
+        results.append(row)
+
+    return results
+
+
+def get_results_summary(run_id):
+    """Get unique vs total return counts for a run."""
+    conn = get_db()
+    total = conn.execute(
+        "SELECT COUNT(*) as cnt FROM flagged_returns WHERE run_id = ?", (run_id,)
+    ).fetchone()
+    unique_orders = conn.execute(
+        "SELECT COUNT(DISTINCT order_id) as cnt FROM flagged_returns WHERE run_id = ?", (run_id,)
+    ).fetchone()
+    dupe_orders = conn.execute(
+        """SELECT order_id, COUNT(*) as cnt FROM flagged_returns
+           WHERE run_id = ? GROUP BY order_id HAVING cnt > 1""", (run_id,)
+    ).fetchall()
+    conn.close()
+    return {
+        "total_rows": total["cnt"] if total else 0,
+        "unique_orders": unique_orders["cnt"] if unique_orders else 0,
+        "duplicate_orders": len(dupe_orders),
+    }
 
 
 def update_action(flagged_return_id, action, notes=""):
@@ -424,6 +505,23 @@ def get_creator_aggregation(run_id):
     """, (run_id,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def save_overview(run_id, overview_data):
+    conn = get_db()
+    conn.execute("INSERT INTO overview_data (run_id, data_json) VALUES (?, ?)",
+                 (run_id, json.dumps(overview_data)))
+    conn.commit()
+    conn.close()
+
+
+def get_overview(run_id):
+    conn = get_db()
+    row = conn.execute("SELECT data_json FROM overview_data WHERE run_id = ?", (run_id,)).fetchone()
+    conn.close()
+    if row:
+        return json.loads(row["data_json"])
+    return None
 
 
 def get_dashboard_stats():

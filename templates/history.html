@@ -1,151 +1,98 @@
 {% extends "base.html" %} {% block title %}Run History — Return Fraud
 Dashboard{% endblock %} {% block content %}
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-slate-900">Analysis History</h1>
-  <a
-    href="/"
-    class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800"
-  >
-    New Analysis
-  </a>
+  <h1 class="text-2xl font-bold text-brand-dark">Analysis History</h1>
+  <a href="/" class="btn btn-primary btn-sm">New Analysis</a>
 </div>
 
 {% if runs %}
-<div
-  class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
->
-  <table class="min-w-full divide-y divide-slate-200">
-    <thead class="bg-slate-50">
-      <tr>
-        <th
-          class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-        >
-          Run
-        </th>
-        <th
-          class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-        >
-          Date
-        </th>
-        <th
-          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
-        >
-          MagAsha Returns
-        </th>
-        <th
-          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
-        >
-          Critical
-        </th>
-        <th
-          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
-        >
-          High
-        </th>
-        <th
-          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
-        >
-          Medium
-        </th>
-        <th
-          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
-        >
-          Low
-        </th>
-        <th
-          class="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
-        >
-          At-Risk $
-        </th>
-        <th
-          class="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
-        >
-          Commission Risk
-        </th>
-        <th
-          class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
-        >
-          Self-Buys
-        </th>
-        <th class="px-6 py-3"></th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-slate-100">
-      {% for run in runs %}
-      <tr class="hover:bg-slate-50">
-        <td class="px-6 py-4 text-sm font-medium text-slate-900">
-          #{{ run.id }}
-        </td>
-        <td class="px-6 py-4 text-sm text-slate-600">
-          {{ run.run_date[:16] }}
-        </td>
-        <td class="px-6 py-4 text-sm text-center font-medium">
-          {{ run.mag_returns }}
-        </td>
-        <td class="px-6 py-4 text-center">
-          {% if run.critical_count > 0 %}
-          <span class="badge-critical px-2 py-1 rounded text-xs font-bold"
-            >{{ run.critical_count }}</span
-          >
-          {% else %}
-          <span class="text-slate-400">0</span>
-          {% endif %}
-        </td>
-        <td class="px-6 py-4 text-center">
-          {% if run.high_count > 0 %}
-          <span class="badge-high px-2 py-1 rounded text-xs font-bold"
-            >{{ run.high_count }}</span
-          >
-          {% else %}
-          <span class="text-slate-400">0</span>
-          {% endif %}
-        </td>
-        <td class="px-6 py-4 text-center text-sm text-yellow-600 font-medium">
-          {{ run.medium_count }}
-        </td>
-        <td class="px-6 py-4 text-center text-sm text-green-600">
-          {{ run.low_count }}
-        </td>
-        <td
-          class="px-6 py-4 text-right text-sm font-mono font-bold text-red-600"
-        >
-          ${{ "%.2f"|format(run.at_risk_refund) }}
-        </td>
-        <td class="px-6 py-4 text-right text-sm font-mono text-red-600">
-          ${{ "%.2f"|format(run.at_risk_commission) }}
-        </td>
-        <td class="px-6 py-4 text-center">
-          {% if run.self_buy_count > 0 %}
-          <span
-            class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-bold"
-            >{{ run.self_buy_count }}</span
-          >
-          {% else %}
-          <span class="text-slate-400">0</span>
-          {% endif %}
-        </td>
-        <td class="px-6 py-4 text-right">
-          <a
-            href="/results/{{ run.id }}"
-            class="text-sm font-medium text-red-600 hover:text-red-800"
-          >
-            View &rarr;
-          </a>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="card bg-base-100 shadow-sm border border-base-300 overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="table table-sm min-w-full">
+      <thead>
+        <tr>
+          <th class="text-left">Run</th>
+          <th class="text-left">Date</th>
+          <th class="text-center">MagAsha Returns</th>
+          <th class="text-center">Critical</th>
+          <th class="text-center">High</th>
+          <th class="text-center">Medium</th>
+          <th class="text-center">Low</th>
+          <th class="text-right">At-Risk $</th>
+          <th class="text-right">Commission Risk</th>
+          <th class="text-center">Self-Buys</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in runs %}
+        <tr>
+          <td class="text-sm font-medium text-brand-dark num">#{{ run.id }}</td>
+          <td class="text-sm text-brand-sage num">{{ run.run_date[:16] }}</td>
+          <td class="text-sm text-center font-medium num">
+            {{ run.mag_returns }}
+          </td>
+          <td class="text-center">
+            {% if run.critical_count > 0 %}
+            <span
+              class="badge-critical px-2 py-1 rounded-full text-xs font-bold num"
+              >{{ run.critical_count }}</span
+            >
+            {% else %}
+            <span class="text-brand-sage/50 num">0</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            {% if run.high_count > 0 %}
+            <span
+              class="badge-high px-2 py-1 rounded-full text-xs font-bold num"
+              >{{ run.high_count }}</span
+            >
+            {% else %}
+            <span class="text-brand-sage/50 num">0</span>
+            {% endif %}
+          </td>
+          <td class="text-center text-sm text-yellow-600 font-medium num">
+            {{ run.medium_count }}
+          </td>
+          <td class="text-center text-sm text-brand-green num">
+            {{ run.low_count }}
+          </td>
+          <td class="text-right text-sm num font-bold text-red-600">
+            ${{ "%.2f"|format(run.at_risk_refund) }}
+          </td>
+          <td class="text-right text-sm num text-red-600">
+            ${{ "%.2f"|format(run.at_risk_commission) }}
+          </td>
+          <td class="text-center">
+            {% if run.self_buy_count > 0 %}
+            <span
+              class="badge-critical px-2 py-1 rounded-full text-xs font-bold num"
+              >{{ run.self_buy_count }}</span
+            >
+            {% else %}
+            <span class="text-brand-sage/50 num">0</span>
+            {% endif %}
+          </td>
+          <td class="text-right">
+            <a href="/results/{{ run.id }}" class="btn btn-lime btn-sm text-xs">
+              View &rarr;
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% else %}
-<div
-  class="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center"
->
-  <p class="text-slate-400 text-lg">No analysis runs yet.</p>
+<div class="card bg-base-100 shadow-sm border border-base-300 p-12 text-center">
+  <p class="text-brand-sage text-lg">No analysis runs yet.</p>
   <a
     href="/"
-    class="mt-4 inline-block text-red-600 font-medium hover:text-red-800"
-    >Upload CSVs to get started &rarr;</a
+    class="mt-4 inline-block text-brand-green font-medium hover:underline"
   >
+    Upload CSVs to get started &rarr;
+  </a>
 </div>
 {% endif %} {% endblock %}

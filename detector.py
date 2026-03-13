@@ -10,7 +10,7 @@ from collections import defaultdict
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 COMMISSION_HOLD_DAYS = 14
-PRODUCT_KEYWORD = "liposomal magnesium"
+PRODUCT_KEYWORDS = ["liposomal magnesium", "magnesium + ashwagandha", "magnesium+ashwagandha", "magasha"]
 
 WEIGHTS = {
     "high_buyer_return_rate": 25,
@@ -76,7 +76,8 @@ def parse_date_mmdd(val):
 
 
 def is_target_product(product_name):
-    return PRODUCT_KEYWORD in (product_name or "").lower()
+    name = (product_name or "").lower()
+    return any(kw in name for kw in PRODUCT_KEYWORDS)
 
 
 def risk_label(score):
@@ -131,6 +132,234 @@ def read_csv_robust(filepath):
     return rows
 
 
+# ─── OVERVIEW — computed from raw CSVs ───────────────────────────────────────
+def parse_overview_data(return_raw_path, affiliate_raw_path, all_orders_raw_path):
+    """Compute top-down overview from the 3 raw TikTok CSVs.
+    Always reflects the latest data in those files."""
+    overview = {}
+
+    returns = read_csv_robust(return_raw_path)
+    affiliates = read_csv_robust(affiliate_raw_path)
+    orders = read_csv_robust(all_orders_raw_path)
+
+    # Filter to MagAsha
+    mag_returns = [r for r in returns if is_target_product(r.get("Product Name", ""))]
+    mag_affiliates = [r for r in affiliates if is_target_product(r.get("Product Name", ""))]
+    mag_orders = [r for r in orders if is_target_product(r.get("Product Name", ""))]
+
+    # ── Build order→creator map from affiliates ──
+    creator_by_order = {}
+    for row in mag_affiliates:
+        oid = clean(row.get("Order ID", ""))
+        creator = clean(row.get("Creator Username", ""))
+        if oid and creator:
+            creator_by_order[oid] = creator
+
+    # Only affiliate returns
+    mag_aff_returns = [r for r in mag_returns
+                       if clean(r.get("Order ID", "")) in creator_by_order]
+
+    # ── Daily stats from Affiliate Raw (orders) & Return Raw (returns) ──
+    orders_by_date = defaultdict(int)
+    for row in mag_affiliates:
+        dt = parse_date_ddmm(row.get("Date", "") or row.get("Time Created", ""))
+        if dt:
+            orders_by_date[dt.strftime("%Y-%m-%d")] += 1
+
+    returns_by_date = defaultdict(int)
+    refund_by_date = defaultdict(float)
+    for row in mag_aff_returns:
+        dt = parse_date_ddmm(row.get("Time Requested", ""))
+        if dt:
+            d = dt.strftime("%Y-%m-%d")
+            returns_by_date[d] += 1
+            refund_by_date[d] += parse_dollar(row.get("Return unit price", ""))
+
+    all_dates = sorted(set(list(orders_by_date.keys()) + list(returns_by_date.keys())))
+    daily = []
+    for d in all_dates:
+        o = orders_by_date.get(d, 0)
+        r = returns_by_date.get(d, 0)
+        daily.append({
+            "date": d,
+            "orders": o,
+            "refunds": r,
+            "refund_rate": f"{r/o*100:.1f}%" if o > 0 else "0.0%",
+            "refund_amount": refund_by_date.get(d, 0.0),
+        })
+    overview["daily"] = daily
+
+    # ── State concentration per day (from All Orders Raw — has State column) ──
+    # Build order_id → date map from affiliates for cross-referencing
+    order_date_map = {}
+    for row in mag_affiliates:
+        oid = clean(row.get("Order ID", ""))
+        dt = parse_date_ddmm(row.get("Date", "") or row.get("Time Created", ""))
+        if oid and dt:
+            order_date_map[oid] = dt.strftime("%Y-%m-%d")
+
+    state_by_date = defaultdict(lambda: defaultdict(int))
+    addr_by_date = defaultdict(lambda: defaultdict(int))
+    for row in mag_orders:
+        oid = clean(row.get("Order ID", ""))
+        date_key = order_date_map.get(oid)
+        if not date_key:
+            # Try parsing date from All Orders Raw (MM/DD/YYYY format)
+            dt = parse_date_mmdd(row.get("Created Time", ""))
+            if dt:
+                date_key = dt.strftime("%Y-%m-%d")
+        if not date_key:
+            continue
+        state = clean(row.get("State", ""))
+        zipcode = clean(row.get("Zipcode", ""))
+        if state:
+            state_by_date[date_key][state] += 1
+        if zipcode:
+            addr_by_date[date_key][zipcode] += 1
+
+    for d_entry in daily:
+        states = state_by_date.get(d_entry["date"], {})
+        if states:
+            top_state = max(states, key=states.get)
+            top_pct = states[top_state] / sum(states.values()) * 100
+            d_entry["top_state"] = f"{top_state} ({top_pct:.1f}%)"
+        else:
+            d_entry["top_state"] = "—"
+
+        addrs = addr_by_date.get(d_entry["date"], {})
+        if addrs:
+            max_addr_orders = max(addrs.values())
+            total = sum(addrs.values())
+            d_entry["addr_concentration"] = f"{max_addr_orders/total*100:.1f}%"
+            d_entry["avg_order_per_addr"] = f"{total/len(addrs):.3f}"
+            d_entry["max_qty_per_addr"] = str(max_addr_orders)
+        else:
+            d_entry["addr_concentration"] = "—"
+            d_entry["avg_order_per_addr"] = "—"
+            d_entry["max_qty_per_addr"] = "—"
+
+    # ── Summary ──
+    total_orders = sum(d["orders"] for d in daily)
+    total_refunds = sum(d["refunds"] for d in daily)
+    days_with_data = len([d for d in daily if d["orders"] > 0])
+
+    # Top state overall (from All Orders Raw which has State column)
+    all_states = defaultdict(int)
+    for row in mag_orders:
+        state = clean(row.get("State", ""))
+        if state:
+            all_states[state] += 1
+    top_state_overall = max(all_states, key=all_states.get) if all_states else "—"
+    top_state_pct = f"{all_states[top_state_overall]/total_orders*100:.1f}%" if total_orders > 0 and all_states else "—"
+
+    # Avg daily return rate
+    daily_rates = [d["refunds"]/d["orders"]*100 for d in daily if d["orders"] > 0]
+    avg_daily_return = f"{sum(daily_rates)/len(daily_rates):.1f}%" if daily_rates else "0.0%"
+
+    overview["summary"] = {
+        "total_orders": str(total_orders),
+        "total_refunds": str(total_refunds),
+        "total_refund_rate": f"{total_refunds/total_orders*100:.2f}%" if total_orders > 0 else "0.0%",
+        "avg_daily_return_pct": avg_daily_return,
+        "avg_daily_returns": f"{total_refunds/days_with_data:.1f}" if days_with_data > 0 else "0",
+        "top_state": top_state_overall,
+        "top_state_pct": top_state_pct,
+        "days_of_data": str(len(daily)),
+    }
+
+    # ── Creator return rates from Affiliate Raw ──
+    creator_orders = defaultdict(int)
+    creator_returns = defaultdict(int)
+    for row in mag_affiliates:
+        creator = clean(row.get("Creator Username", ""))
+        if creator:
+            creator_orders[creator] += 1
+    for row in mag_aff_returns:
+        oid = clean(row.get("Order ID", ""))
+        creator = creator_by_order.get(oid, "")
+        if creator:
+            creator_returns[creator] += 1
+
+    creators = []
+    for c in creator_orders:
+        o = creator_orders[c]
+        r = creator_returns.get(c, 0)
+        creators.append({
+            "username": c,
+            "orders": o,
+            "returns": r,
+            "return_pct": f"{r/o*100:.2f}%" if o > 0 else "0.00%",
+        })
+    creators.sort(key=lambda x: x["returns"], reverse=True)
+    overview["creators"] = creators
+    overview["creators_with_returns"] = [c for c in creators if c["returns"] > 0]
+
+    # ── User return rates ──
+    # All MagAsha orders per buyer (from All Orders Raw)
+    user_orders = defaultdict(int)
+    for row in mag_orders:
+        buyer = clean(row.get("Buyer Username", ""))
+        if buyer:
+            user_orders[buyer] += 1
+
+    # MagAsha returns per buyer
+    user_returns = defaultdict(int)
+    for row in mag_aff_returns:
+        buyer = clean(row.get("Buyer Username", ""))
+        if buyer:
+            user_returns[buyer] += 1
+
+    users = []
+    all_usernames = set(list(user_orders.keys()) + list(user_returns.keys()))
+    for u in all_usernames:
+        o = user_orders.get(u, 0)
+        r = user_returns.get(u, 0)
+        if o > 0 or r > 0:
+            users.append({
+                "username": u,
+                "orders": o,
+                "returns": r,
+                "return_pct": f"{r/o*100:.2f}%" if o > 0 else "N/A",
+            })
+    users.sort(key=lambda x: x["returns"], reverse=True)
+    overview["users"] = users
+    overview["users_with_returns"] = [u for u in users if u["returns"] > 0]
+
+    # ── User & Creator benchmarks ──
+    user_rates = [u["returns"]/u["orders"]*100 for u in users if u["orders"] > 0]
+    creator_rates = [c["returns"]/c["orders"]*100 for c in creators if c["orders"] > 0]
+
+    def percentile(data, p):
+        if not data:
+            return 0
+        s = sorted(data)
+        k = (len(s) - 1) * p / 100
+        f = int(k)
+        c = min(f + 1, len(s) - 1)
+        return s[f] + (k - f) * (s[c] - s[f])
+
+    u_avg = sum(user_rates)/len(user_rates) if user_rates else 0
+    u_p99 = percentile(user_rates, 99)
+    c_avg = sum(creator_rates)/len(creator_rates) if creator_rates else 0
+    c_p99 = percentile(creator_rates, 99)
+    c_p95 = percentile(creator_rates, 95)
+
+    overview["user_bench"] = {
+        "avg_refund_pct": f"{u_avg:.2f}%",
+        "p99_refund_pct": f"{u_p99:.2f}%",
+        "above_avg": str(len([r for r in user_rates if r > u_avg])),
+        "above_p99": str(len([r for r in user_rates if r > u_p99])),
+    }
+    overview["creator_bench"] = {
+        "avg_refund_pct": f"{c_avg:.2f}%",
+        "p99_refund_pct": f"{c_p99:.2f}%",
+        "above_avg": str(len([r for r in creator_rates if r > c_avg])),
+        "above_p95": str(len([r for r in creator_rates if r > c_p95])),
+    }
+
+    return overview
+
+
 # ─── MAIN DETECTION PIPELINE ─────────────────────────────────────────────────
 def run_detection(return_raw_path, affiliate_raw_path, all_orders_raw_path):
     """
@@ -145,6 +374,16 @@ def run_detection(return_raw_path, affiliate_raw_path, all_orders_raw_path):
     mag_returns_all = [r for r in returns if is_target_product(r.get("Product Name", ""))]
     mag_affiliates = [r for r in affiliates if is_target_product(r.get("Product Name", ""))]
     mag_orders = [r for r in orders if is_target_product(r.get("Product Name", ""))]
+
+    import sys
+    print(f"[DETECTOR] Total returns: {len(returns)}, MagAsha returns: {len(mag_returns_all)}", flush=True, file=sys.stderr)
+    print(f"[DETECTOR] Total affiliates: {len(affiliates)}, MagAsha affiliates: {len(mag_affiliates)}", flush=True, file=sys.stderr)
+    print(f"[DETECTOR] Total orders: {len(orders)}, MagAsha orders: {len(mag_orders)}", flush=True, file=sys.stderr)
+    if len(mag_returns_all) == 0 and len(returns) > 0:
+        sample_products = set(r.get("Product Name", "")[:80] for r in returns[:500])
+        print(f"[DETECTOR] WARNING: 0 MagAsha returns! Sample product names:", flush=True, file=sys.stderr)
+        for p in list(sample_products)[:15]:
+            print(f"  - {p}", flush=True, file=sys.stderr)
 
     # ── Build lookups (needs all affiliates for order->creator mapping) ──
     lookups = _build_lookups(returns, affiliates, orders, mag_returns_all, mag_affiliates, mag_orders)

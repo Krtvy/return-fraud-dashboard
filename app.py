@@ -13,7 +13,7 @@ import database as db
 import detector
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -65,9 +65,17 @@ def upload():
             paths["all_orders_raw"],
         )
 
+        # Compute overview from the uploaded raw CSVs
+        overview_data = detector.parse_overview_data(
+            paths["return_raw"],
+            paths["affiliate_raw"],
+            paths["all_orders_raw"],
+        )
+
         run_id = db.save_run(stats)
         db.save_results(run_id, results)
         db.save_daily_stats(run_id, daily_stats)
+        db.save_overview(run_id, overview_data)
         db.update_creator_profiles(results)
 
         flash(
@@ -99,11 +107,13 @@ def results(run_id):
     risk_filter = request.args.get("risk", "ALL")
     action_filter = request.args.get("action", "ALL")
     rows = db.get_results(run_id, risk_filter=risk_filter, action_filter=action_filter)
+    summary = db.get_results_summary(run_id)
 
     return render_template("results.html",
                            run=run, rows=rows,
                            risk_filter=risk_filter,
-                           action_filter=action_filter)
+                           action_filter=action_filter,
+                           summary=summary)
 
 
 @app.route("/users/<int:run_id>")
@@ -144,6 +154,21 @@ def stats(run_id):
         return redirect(url_for("index"))
     daily = db.get_daily_stats(run_id)
     return render_template("stats.html", run=run, daily=daily)
+
+
+@app.route("/overview/<int:run_id>")
+def overview(run_id):
+    run = db.get_run(run_id)
+    if not run:
+        flash("Run not found", "error")
+        return redirect(url_for("index"))
+
+    data = db.get_overview(run_id)
+    if not data:
+        flash("No overview data for this run. Re-upload CSVs to generate it.", "error")
+        return redirect(url_for("results", run_id=run_id))
+
+    return render_template("overview.html", run=run, data=data)
 
 
 @app.route("/action", methods=["POST"])
@@ -192,8 +217,9 @@ def pct_filter(value):
         return "0.0%"
 
 
-# ─── INIT & RUN ──────────────────────────────────────────────────────────────
+# ─── INIT ────────────────────────────────────────────────────────────────────
+db.init_db()
+
 if __name__ == "__main__":
-    db.init_db()
     print("\n  Return Fraud Dashboard running at http://127.0.0.1:8080\n")
     app.run(debug=True, port=8080, host="0.0.0.0")

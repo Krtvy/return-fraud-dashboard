@@ -3,295 +3,253 @@ endblock %} {% block content %}
 <!-- Run Header -->
 <div class="flex items-center justify-between mb-6">
   <div>
-    <h1 class="text-2xl font-bold text-slate-900">Analysis Results</h1>
-    <p class="text-slate-500 text-sm">
+    <h1 class="text-2xl font-bold text-brand-dark">Analysis Results</h1>
+    <p class="text-brand-sage text-sm">
       Run #{{ run.id }} — {{ run.run_date[:16] }} — {{ run.mag_returns }}
       MagAsha returns analyzed
     </p>
   </div>
-  <a
-    href="/"
-    class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800"
-  >
-    New Analysis
-  </a>
+  <a href="/" class="btn btn-primary btn-sm">New Analysis</a>
 </div>
 
 <!-- Data Level Tabs -->
-<div class="flex space-x-1 mb-6 bg-slate-100 rounded-lg p-1 w-fit">
-  <a
-    href="/results/{{ run.id }}"
-    class="px-4 py-2 rounded-md text-sm font-medium bg-white text-slate-900 shadow-sm"
+<div role="tablist" class="tabs tabs-bordered mb-6">
+  <a href="/overview/{{ run.id }}" role="tab" class="tab">Overview</a>
+  <a href="/results/{{ run.id }}" role="tab" class="tab tab-active"
     >All Returns</a
   >
-  <a
-    href="/users/{{ run.id }}"
-    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
-    >User Level</a
-  >
-  <a
-    href="/addresses/{{ run.id }}"
-    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
-    >Address Level</a
-  >
-  <a
-    href="/creator-data/{{ run.id }}"
-    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
-    >Creator Level</a
-  >
-  <a
-    href="/stats/{{ run.id }}"
-    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
-    >Daily Stats</a
-  >
+  <a href="/users/{{ run.id }}" role="tab" class="tab">User Level</a>
+  <a href="/addresses/{{ run.id }}" role="tab" class="tab">Address Level</a>
+  <a href="/creator-data/{{ run.id }}" role="tab" class="tab">Creator Level</a>
+  <a href="/stats/{{ run.id }}" role="tab" class="tab">Daily Stats</a>
 </div>
 
-<!-- Summary Cards -->
-<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
-  <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
-    <div class="text-2xl font-bold text-slate-900">{{ run.mag_returns }}</div>
-    <div class="text-xs text-slate-500 mt-1">Total Returns</div>
+<!-- Stats Row -->
+<div
+  class="stats stats-horizontal shadow-sm border border-base-300 w-full mb-6"
+>
+  <div class="stat">
+    <div class="stat-title text-brand-sage text-xs">Unique Orders</div>
+    <div class="stat-value text-brand-dark text-xl num">
+      {{ summary.unique_orders }}<span class="text-sm text-brand-sage"
+        >({{ summary.total_rows }})</span
+      >
+    </div>
   </div>
-  <div class="bg-red-50 rounded-lg border border-red-200 p-4 text-center">
-    <div class="text-2xl font-bold text-red-600">{{ run.critical_count }}</div>
-    <div class="text-xs text-red-700 mt-1">Critical</div>
+  {% if summary.duplicate_orders > 0 %}
+  <div class="stat">
+    <div class="stat-title text-brand-sage text-xs">Duplicates</div>
+    <div class="stat-value text-orange-600 text-xl num">
+      {{ summary.duplicate_orders }}
+    </div>
   </div>
-  <div class="bg-orange-50 rounded-lg border border-orange-200 p-4 text-center">
-    <div class="text-2xl font-bold text-orange-600">{{ run.high_count }}</div>
-    <div class="text-xs text-orange-700 mt-1">High</div>
+  {% endif %}
+  <div class="stat stat-bar danger">
+    <div class="stat-title text-brand-sage text-xs">Critical</div>
+    <div class="stat-value text-red-600 text-xl num">
+      {{ run.critical_count }}
+    </div>
   </div>
-  <div class="bg-yellow-50 rounded-lg border border-yellow-200 p-4 text-center">
-    <div class="text-2xl font-bold text-yellow-600">{{ run.medium_count }}</div>
-    <div class="text-xs text-yellow-700 mt-1">Medium</div>
+  <div class="stat stat-bar warning">
+    <div class="stat-title text-brand-sage text-xs">High</div>
+    <div class="stat-value text-orange-600 text-xl num">
+      {{ run.high_count }}
+    </div>
   </div>
-  <div class="bg-green-50 rounded-lg border border-green-200 p-4 text-center">
-    <div class="text-2xl font-bold text-green-600">{{ run.low_count }}</div>
-    <div class="text-xs text-green-700 mt-1">Low</div>
+  <div class="stat">
+    <div class="stat-title text-brand-sage text-xs">Medium</div>
+    <div class="stat-value text-yellow-600 text-xl num">
+      {{ run.medium_count }}
+    </div>
   </div>
-  <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
-    <div class="text-2xl font-bold text-red-600">
+  <div class="stat">
+    <div class="stat-title text-brand-sage text-xs">Low</div>
+    <div class="stat-value text-brand-green text-xl num">
+      {{ run.low_count }}
+    </div>
+  </div>
+  <div class="stat">
+    <div class="stat-title text-brand-sage text-xs">At-Risk Refund</div>
+    <div class="stat-value text-red-600 text-xl num">
       ${{ "%.0f"|format(run.at_risk_refund) }}
     </div>
-    <div class="text-xs text-slate-500 mt-1">At-Risk Refund</div>
   </div>
-  <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
-    <div class="text-2xl font-bold text-red-600">
+  <div class="stat">
+    <div class="stat-title text-brand-sage text-xs">Commission Risk</div>
+    <div class="stat-value text-red-600 text-xl num">
       ${{ "%.0f"|format(run.at_risk_commission) }}
     </div>
-    <div class="text-xs text-slate-500 mt-1">Commission Risk</div>
   </div>
 </div>
 
 <!-- Self-Buy Alerts -->
 {% set self_buys = [] %} {% for r in rows %}{% if "SELF-BUY" in r.flags %}{% if
 self_buys.append(r) %}{% endif %}{% endif %}{% endfor %} {% if self_buys %}
-<div class="bg-red-50 border border-red-300 rounded-lg p-4 mb-6">
-  <h3 class="font-bold text-red-900 mb-2">
-    SELF-BUY ALERTS — Creators buying their own product
-  </h3>
-  {% for r in self_buys %}
-  <div
-    class="flex items-center justify-between py-2 border-b border-red-200 last:border-0 text-sm"
-  >
-    <div>
-      <span class="font-mono font-bold text-red-800"
-        >@{{ r.buyer_username }}</span
-      >
-      {% if r.creator and r.buyer_username != r.creator %}
-      <span class="text-red-600">buying via @{{ r.creator }}</span>
-      {% else %}
-      <span class="text-red-600">IS the creator</span>
-      {% endif %}
+<div class="alert alert-error mb-6">
+  <div class="w-full">
+    <h3 class="font-bold mb-2">
+      SELF-BUY ALERTS — Creators buying their own product
+    </h3>
+    {% for r in self_buys %}
+    <div
+      class="flex items-center justify-between py-2 border-b border-red-200/30 last:border-0 text-sm"
+    >
+      <div>
+        <span class="num font-bold">@{{ r.buyer_username }}</span>
+        {% if r.creator and r.buyer_username != r.creator %}
+        <span class="opacity-80">buying via @{{ r.creator }}</span>
+        {% else %}
+        <span class="opacity-80">IS the creator</span>
+        {% endif %}
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="font-bold num">${{ "%.2f"|format(r.refund_amount) }}</span>
+        <span class="badge badge-sm num">Score: {{ r.fraud_score }}</span>
+      </div>
     </div>
-    <div class="flex items-center space-x-3">
-      <span class="font-bold">${{ "%.2f"|format(r.refund_amount) }}</span>
-      <span class="text-xs px-2 py-1 rounded badge-critical"
-        >Score: {{ r.fraud_score }}</span
-      >
-    </div>
+    {% endfor %}
   </div>
-  {% endfor %}
 </div>
 {% endif %}
 
 <!-- Filters -->
-<div class="flex flex-wrap items-center gap-3 mb-4">
-  <span class="text-sm font-medium text-slate-600">Risk:</span>
+<div class="flex flex-wrap items-center gap-2 mb-4">
+  <span class="text-sm font-medium text-brand-sage">Risk:</span>
   {% for level in ['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] %}
   <a
     href="?risk={{ level }}&action={{ action_filter }}"
-    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {% if risk_filter == level %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}"
+    class="btn btn-xs {% if risk_filter == level %}btn-primary{% else %}btn-ghost border-base-300{% endif %}"
   >
     {{ level }}
   </a>
   {% endfor %}
 
-  <span class="text-sm font-medium text-slate-600 ml-4">Decision:</span>
+  <div class="divider divider-horizontal mx-1"></div>
+
+  <span class="text-sm font-medium text-brand-sage">Decision:</span>
   {% for act in ['ALL', 'PENDING', 'APPROVE', 'REJECT', 'ESCALATE',
   'INVESTIGATE'] %}
   <a
     href="?risk={{ risk_filter }}&action={{ act }}"
-    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {% if action_filter == act %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}"
+    class="btn btn-xs {% if action_filter == act %}btn-primary{% else %}btn-ghost border-base-300{% endif %}"
   >
     {{ act }}
   </a>
   {% endfor %}
 
-  <span class="ml-auto text-sm text-slate-400">{{ rows|length }} results</span>
+  <span class="ml-auto text-sm text-brand-sage num"
+    >{{ rows|length }} results</span
+  >
 </div>
 
 <!-- Results Table -->
-<div
-  class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
->
+<div class="card bg-base-100 shadow-sm border border-base-300 overflow-hidden">
   <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-slate-200">
-      <thead class="bg-slate-50">
+    <table class="table table-sm">
+      <thead>
         <tr>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Risk
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Score
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Buyer
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Creator
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Reason
-          </th>
-          <th
-            class="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
-          >
-            Refund
-          </th>
-          <th
-            class="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
-          >
-            Commission
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Why Flagged
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Status
-          </th>
-          <th
-            class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
-          >
-            Your Decision
-          </th>
+          <th>Risk</th>
+          <th>Score</th>
+          <th>Buyer</th>
+          <th>Creator</th>
+          <th>Reason</th>
+          <th class="text-right">Refund</th>
+          <th class="text-right">Commission</th>
+          <th>Why Flagged</th>
+          <th>Status</th>
+          <th class="text-center">Decision</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-100">
+      <tbody>
         {% for r in rows %}
         <tr
-          class="hover:bg-slate-50 cursor-pointer"
+          class="hover cursor-pointer {% if r.order_dupe_count > 1 %}border-l-2 border-l-orange-400{% endif %} {% if r.risk_level == 'CRITICAL' %}risk-critical{% elif r.risk_level == 'HIGH' %}risk-high{% endif %}"
           onclick="toggleRow({{ r.id }})"
         >
-          <td class="px-4 py-3">
+          <td>
             <span
-              class="inline-block px-2 py-1 rounded text-xs font-bold
-                            badge-{{ r.risk_level|lower }}"
+              class="inline-block px-2 py-1 rounded text-xs font-bold badge-{{ r.risk_level|lower }}"
               >{{ r.risk_level }}</span
             >
           </td>
-          <td class="px-4 py-3 font-mono font-bold text-sm">
-            {{ r.fraud_score }}
+          <td class="num font-bold text-sm">{{ r.fraud_score }}</td>
+          <td class="text-sm font-medium text-brand-dark">
+            @{{ r.buyer_username }} {% if r.order_dupe_count > 1 %}
+            <span class="badge badge-warning badge-xs num ml-1"
+              >({{ r.order_dupe_count }})</span
+            >
+            {% endif %}
           </td>
-          <td class="px-4 py-3 text-sm font-medium text-slate-900">
-            @{{ r.buyer_username }}
-          </td>
-          <td class="px-4 py-3 text-sm text-slate-600">
-            {{ r.creator or '—' }}
-          </td>
-          <td class="px-4 py-3 text-sm text-slate-600">
-            {{ r.return_reason }}
-          </td>
-          <td class="px-4 py-3 text-sm text-right font-mono">
-            ${{ "%.2f"|format(r.refund_amount) }}
+          <td class="text-sm text-brand-sage">{{ r.creator or '—' }}</td>
+          <td class="text-sm text-brand-sage">{{ r.merged_reasons }}</td>
+          <td class="text-sm text-right num">
+            {% if r.order_dupe_count > 1 %}${{ "%.2f"|format(r.combined_refund)
+            }}{% else %}${{ "%.2f"|format(r.refund_amount) }}{% endif %}
           </td>
           <td
-            class="px-4 py-3 text-sm text-right font-mono {% if r.commission_at_risk > 0 %}text-red-600 font-bold{% endif %}"
+            class="text-sm text-right num {% if r.combined_commission > 0 %}text-red-600 font-bold{% endif %}"
           >
-            ${{ "%.2f"|format(r.commission_at_risk) }}
+            {% if r.order_dupe_count > 1 %}${{
+            "%.2f"|format(r.combined_commission) }}{% else %}${{
+            "%.2f"|format(r.commission_at_risk) }}{% endif %}
           </td>
-          <td class="px-4 py-3 text-xs" style="max-width: 280px">
+          <td class="text-xs" style="max-width: 280px">
             {% if r.flags %} {% for flag in r.flags.split(' | ')[:3] %}
             <span
-              class="flag-tag {% if 'SELF-BUY' in flag %}bg-red-100 text-red-800 {% elif 'SOCK PUPPET' in flag %}bg-purple-100 text-purple-800 {% elif 'COMMISSION' in flag %}bg-orange-100 text-orange-800 {% elif 'Suspicious' in flag or 'Missing' in flag %}bg-yellow-100 text-yellow-800 {% elif 'Same-day' in flag %}bg-pink-100 text-pink-800 {% elif 'BNPL' in flag %}bg-indigo-100 text-indigo-800 {% elif 'Repeat' in flag or 'Duplicate' in flag %}bg-amber-100 text-amber-800 {% elif 'Buyer return rate' in flag %}bg-red-50 text-red-700 {% else %}bg-slate-100 text-slate-700{% endif %}"
+              class="flag-tag {% if 'SELF-BUY' in flag %}flag-red {% elif 'SOCK PUPPET' in flag %}flag-purple {% elif 'COMMISSION' in flag %}flag-orange {% elif 'Suspicious' in flag or 'Missing' in flag %}bg-yellow-50 text-yellow-800 {% elif 'Same-day' in flag %}bg-pink-50 text-pink-800 {% elif 'BNPL' in flag %}flag-blue {% elif 'Repeat' in flag or 'Duplicate' in flag %}bg-amber-50 text-amber-800 {% elif 'Buyer return rate' in flag %}flag-red {% else %}flag-default{% endif %}"
               >{{ flag }}</span
             >
             {% endfor %} {% if r.flags.split(' | ')|length > 3 %}
-            <span class="flag-tag bg-slate-200 text-slate-600"
+            <span class="flag-tag flag-default"
               >+{{ r.flags.split(' | ')|length - 3 }} more</span
             >
             {% endif %} {% else %}
-            <span class="text-slate-400">—</span>
+            <span class="text-brand-sage">—</span>
             {% endif %}
           </td>
-          <td class="px-4 py-3 text-xs text-slate-500">
-            {{ r.return_status }}
-          </td>
-          <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
+          <td class="text-xs text-brand-sage">{{ r.merged_statuses }}</td>
+          <td class="text-center" onclick="event.stopPropagation()">
             {% if r.user_action %}
             <span
-              class="inline-block px-3 py-1 rounded-full text-xs font-bold {% if r.user_action == 'REJECT' %}bg-red-100 text-red-800 {% elif r.user_action == 'APPROVE' %}bg-green-100 text-green-800 {% elif r.user_action == 'ESCALATE' %}bg-orange-100 text-orange-800 {% else %}bg-blue-100 text-blue-800{% endif %}"
+              class="badge badge-sm {% if r.user_action == 'REJECT' %}badge-error{% elif r.user_action == 'APPROVE' %}badge-success{% elif r.user_action == 'ESCALATE' %}badge-warning{% else %}badge-info{% endif %}"
               id="badge-{{ r.id }}"
             >
               {{ r.user_action }}
             </span>
             {% else %}
-            <div class="flex justify-center space-x-1" id="actions-{{ r.id }}">
+            <div class="join" id="actions-{{ r.id }}">
               <button
                 onclick="takeAction({{ r.id }}, 'APPROVE')"
-                class="action-btn px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800 hover:bg-green-200"
+                class="btn btn-xs join-item btn-success btn-outline"
               >
                 Approve
               </button>
               <button
                 onclick="takeAction({{ r.id }}, 'REJECT')"
-                class="action-btn px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-800 hover:bg-red-200"
+                class="btn btn-xs join-item btn-error btn-outline"
               >
                 Reject
               </button>
               <button
                 onclick="takeAction({{ r.id }}, 'ESCALATE')"
-                class="action-btn px-2 py-1 rounded text-xs font-semibold bg-orange-100 text-orange-800 hover:bg-orange-200"
+                class="btn btn-xs join-item btn-warning btn-outline"
               >
-                Escalate
+                Esc
               </button>
             </div>
             {% endif %}
           </td>
         </tr>
         <!-- Expandable detail row -->
-        <tr id="detail-{{ r.id }}" class="hidden bg-slate-50">
+        <tr id="detail-{{ r.id }}" class="hidden bg-base-200/50">
           <td colspan="10" class="px-6 py-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <h4 class="font-semibold text-slate-900 mb-2">Fraud Flags</h4>
+                <h4 class="font-semibold text-brand-dark mb-2">Fraud Flags</h4>
                 <div class="space-y-1">
                   {% for flag in r.flags.split(' | ') if r.flags %}
                   <div
-                    class="flag-tag {% if 'SELF-BUY' in flag %}bg-red-100 text-red-800 {% elif 'SOCK PUPPET' in flag %}bg-purple-100 text-purple-800 {% elif 'COMMISSION' in flag %}bg-orange-100 text-orange-800 {% elif 'Suspicious' in flag %}bg-yellow-100 text-yellow-800 {% else %}bg-slate-100 text-slate-700{% endif %}"
+                    class="flag-tag {% if 'SELF-BUY' in flag %}flag-red {% elif 'SOCK PUPPET' in flag %}flag-purple {% elif 'COMMISSION' in flag %}flag-orange {% elif 'Suspicious' in flag %}bg-yellow-50 text-yellow-800 {% else %}flag-default{% endif %}"
                   >
                     {{ flag }}
                   </div>
@@ -300,61 +258,145 @@ self_buys.append(r) %}{% endif %}{% endif %}{% endfor %} {% if self_buys %}
               </div>
               <div class="space-y-2">
                 <div class="flex justify-between">
-                  <span class="text-slate-500">Order ID</span>
-                  <span class="font-mono text-xs">{{ r.order_id }}</span>
+                  <span class="text-brand-sage">Order ID</span>
+                  <span class="num text-xs">{{ r.order_id }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-slate-500">Return Order ID</span>
-                  <span class="font-mono text-xs">{{ r.return_order_id }}</span>
+                  <span class="text-brand-sage">Return Order ID</span>
+                  <span class="num text-xs">{{ r.return_order_id }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-slate-500">Requested</span>
+                  <span class="text-brand-sage">Requested</span>
                   <span>{{ r.time_requested or '—' }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-slate-500">Days Since Delivery</span>
-                  <span
+                  <span class="text-brand-sage">Days Since Delivery</span>
+                  <span class="num"
                     >{{ r.days_since_delivery if r.days_since_delivery != ''
                     else '—' }}</span
                   >
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-slate-500">Commission Paid?</span>
+                  <span class="text-brand-sage">Commission Paid?</span>
                   <span
                     class="{% if r.commission_paid == 'YES' %}text-red-600 font-bold{% endif %}"
                     >{{ r.commission_paid }}</span
                   >
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-slate-500">Payment Method</span>
+                  <span class="text-brand-sage">Payment Method</span>
                   <span>{{ r.payment_method or '—' }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-slate-500">Location</span>
+                  <span class="text-brand-sage">Location</span>
                   <span
                     >{{ r.city }}{% if r.state %}, {{ r.state }}{% endif %} {{
                     r.zipcode }}</span
                   >
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-slate-500">Buyer Orders / Returns</span>
-                  <span
+                  <span class="text-brand-sage">Buyer Orders / Returns</span>
+                  <span class="num"
                     >{{ r.buyer_unique_orders }} / {{ r.buyer_unique_returns }}
                     ({{ r.buyer_return_rate }})</span
                   >
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-slate-500">System Recommendation</span>
+                  <span class="text-brand-sage">System Recommendation</span>
                   <span class="font-semibold">{{ r.recommended_action }}</span>
                 </div>
                 {% if r.buyer_note %}
-                <div class="mt-2 p-2 bg-yellow-50 rounded text-xs">
-                  <span class="font-semibold">Buyer Note:</span> {{ r.buyer_note
-                  }}
+                <div class="alert alert-warning mt-2 text-xs py-2">
+                  <span
+                    ><span class="font-semibold">Buyer Note:</span> {{
+                    r.buyer_note }}</span
+                  >
                 </div>
                 {% endif %}
               </div>
             </div>
+
+            <!-- Sub-returns for duplicate orders -->
+            {% if r.sub_returns %}
+            <div class="divider text-orange-600 text-xs font-semibold">
+              {{ r.order_dupe_count }} RETURN REQUESTS ON THIS ORDER
+            </div>
+            <div class="space-y-3">
+              <div class="card bg-base-100 border border-base-300 p-3">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold text-brand-dark"
+                    >Return #1 — {{ r.return_reason }}</span
+                  >
+                  <span class="badge badge-ghost badge-xs num"
+                    >{{ r.return_status }}</span
+                  >
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-xs text-brand-sage">
+                  <div>
+                    Return ID:
+                    <span class="num">...{{ r.return_order_id[-6:] }}</span>
+                  </div>
+                  <div>
+                    Refund:
+                    <span class="num font-semibold"
+                      >${{ "%.2f"|format(r.refund_amount) }}</span
+                    >
+                  </div>
+                  <div>Requested: {{ r.time_requested or '—' }}</div>
+                </div>
+                {% if r.buyer_note %}
+                <div class="mt-1 text-xs text-brand-sage">
+                  <span class="font-semibold">Note:</span> {{ r.buyer_note }}
+                </div>
+                {% endif %}
+              </div>
+              {% for sub in r.sub_returns %}
+              <div class="card bg-orange-50 border border-orange-200 p-3">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold text-orange-800"
+                    >Return #{{ loop.index + 1 }} — {{ sub.return_reason
+                    }}</span
+                  >
+                  <span class="badge badge-ghost badge-xs num"
+                    >{{ sub.return_status }}</span
+                  >
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-xs text-brand-sage">
+                  <div>
+                    Return ID:
+                    <span class="num">...{{ sub.return_order_id[-6:] }}</span>
+                  </div>
+                  <div>
+                    Refund:
+                    <span class="num font-semibold"
+                      >${{ "%.2f"|format(sub.refund_amount) }}</span
+                    >
+                  </div>
+                  <div>Requested: {{ sub.time_requested or '—' }}</div>
+                </div>
+                <div
+                  class="grid grid-cols-2 gap-2 text-xs text-brand-sage mt-1"
+                >
+                  <div>
+                    Score:
+                    <span class="num font-bold">{{ sub.fraud_score }}</span>
+                  </div>
+                  <div>
+                    Recommendation:
+                    <span class="font-semibold"
+                      >{{ sub.recommended_action }}</span
+                    >
+                  </div>
+                </div>
+                {% if sub.buyer_note %}
+                <div class="mt-1 text-xs text-brand-sage">
+                  <span class="font-semibold">Note:</span> {{ sub.buyer_note }}
+                </div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -363,7 +405,7 @@ self_buys.append(r) %}{% endif %}{% endif %}{% endfor %} {% if self_buys %}
   </div>
 
   {% if not rows %}
-  <div class="p-12 text-center text-slate-400">
+  <div class="p-12 text-center text-brand-sage">
     No results match your filters.
   </div>
   {% endif %}
@@ -386,13 +428,13 @@ self_buys.append(r) %}{% endif %}{% endif %}{% endfor %} {% if self_buys %}
       .then((data) => {
         if (data.status === "ok") {
           const container = document.getElementById("actions-" + id);
-          const colors = {
-            APPROVE: "bg-green-100 text-green-800",
-            REJECT: "bg-red-100 text-red-800",
-            ESCALATE: "bg-orange-100 text-orange-800",
-            INVESTIGATE: "bg-blue-100 text-blue-800",
+          const cls = {
+            APPROVE: "badge-success",
+            REJECT: "badge-error",
+            ESCALATE: "badge-warning",
+            INVESTIGATE: "badge-info",
           };
-          container.innerHTML = `<span class="inline-block px-3 py-1 rounded-full text-xs font-bold ${colors[action] || "bg-slate-100"}">${action}</span>`;
+          container.innerHTML = `<span class="badge badge-sm ${cls[action] || "badge-ghost"}">${action}</span>`;
         }
       });
   }

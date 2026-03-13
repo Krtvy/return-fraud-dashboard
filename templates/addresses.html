@@ -2,160 +2,94 @@
 endblock %} {% block content %}
 <div class="flex items-center justify-between mb-4">
   <div>
-    <h1 class="text-2xl font-bold text-slate-900">Address Level Data</h1>
-    <p class="text-slate-500 text-sm">
+    <h1 class="text-2xl font-bold text-brand-dark">Address Level Data</h1>
+    <p class="text-brand-sage text-sm">
       Run #{{ run.id }} — {{ run.run_date[:16] }} — Aggregated by location
     </p>
   </div>
-  <a
-    href="/"
-    class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800"
-    >New Analysis</a
-  >
+  <a href="/" class="btn btn-primary btn-sm">New Analysis</a>
 </div>
 
-<div class="flex space-x-1 mb-6 bg-slate-100 rounded-lg p-1 w-fit">
-  <a
-    href="/results/{{ run.id }}"
-    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
-    >All Returns</a
-  >
-  <a
-    href="/users/{{ run.id }}"
-    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
-    >User Level</a
-  >
-  <a
-    href="/addresses/{{ run.id }}"
-    class="px-4 py-2 rounded-md text-sm font-medium bg-white text-slate-900 shadow-sm"
+<div role="tablist" class="tabs tabs-bordered mb-6">
+  <a href="/overview/{{ run.id }}" role="tab" class="tab">Overview</a>
+  <a href="/results/{{ run.id }}" role="tab" class="tab">All Returns</a>
+  <a href="/users/{{ run.id }}" role="tab" class="tab">User Level</a>
+  <a href="/addresses/{{ run.id }}" role="tab" class="tab tab-active"
     >Address Level</a
   >
-  <a
-    href="/creator-data/{{ run.id }}"
-    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
-    >Creator Level</a
-  >
-  <a
-    href="/stats/{{ run.id }}"
-    class="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
-    >Daily Stats</a
-  >
+  <a href="/creator-data/{{ run.id }}" role="tab" class="tab">Creator Level</a>
+  <a href="/stats/{{ run.id }}" role="tab" class="tab">Daily Stats</a>
 </div>
 
-<p class="text-sm text-slate-500 mb-4">
-  {{ rows|length }} unique locations with MagAsha affiliate returns
+<p class="text-sm text-brand-sage mb-4">
+  <span class="num">{{ rows|length }}</span> unique locations with MagAsha
+  affiliate returns
 </p>
 
-<div
-  class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
->
+<div class="card bg-base-100 shadow-sm border border-base-300 overflow-hidden">
   <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-slate-200">
-      <thead class="bg-slate-50">
+    <table class="table table-sm min-w-full">
+      <thead>
         <tr>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            State
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            City
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Zip
-          </th>
-          <th
-            class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
-          >
-            Unique Buyers
-          </th>
-          <th
-            class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
-          >
-            Returns
-          </th>
-          <th
-            class="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
-          >
-            Refund $
-          </th>
-          <th
-            class="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase"
-          >
-            Commission Risk
-          </th>
-          <th
-            class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase"
-          >
-            Max Score
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Buyers
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Creators
-          </th>
-          <th
-            class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase"
-          >
-            Reasons
-          </th>
+          <th class="text-left">State</th>
+          <th class="text-left">City</th>
+          <th class="text-left">Zip</th>
+          <th class="text-center">Unique Buyers</th>
+          <th class="text-center">Returns</th>
+          <th class="text-right">Refund $</th>
+          <th class="text-right">Commission Risk</th>
+          <th class="text-center">Max Score</th>
+          <th class="text-left">Buyers</th>
+          <th class="text-left">Creators</th>
+          <th class="text-left">Reasons</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-100">
+      <tbody>
         {% for r in rows %}
         <tr
-          class="hover:bg-slate-50 {% if r.unique_buyers >= 2 %}bg-amber-50{% endif %} {% if r.max_score >= 60 %}risk-critical{% elif r.max_score >= 40 %}risk-high{% endif %}"
+          class="{% if r.unique_buyers >= 2 %}bg-amber-50/50{% endif %} {% if r.max_score >= 60 %}risk-critical{% elif r.max_score >= 40 %}risk-high{% endif %}"
         >
-          <td class="px-4 py-3 text-sm font-medium">{{ r.state }}</td>
-          <td class="px-4 py-3 text-sm">{{ r.city }}</td>
-          <td class="px-4 py-3 text-sm font-mono">{{ r.zipcode }}</td>
+          <td class="text-sm font-medium">{{ r.state }}</td>
+          <td class="text-sm">{{ r.city }}</td>
+          <td class="text-sm num">{{ r.zipcode }}</td>
           <td
-            class="px-4 py-3 text-sm text-center font-bold {% if r.unique_buyers >= 2 %}text-orange-600{% endif %}"
+            class="text-sm text-center font-bold num {% if r.unique_buyers >= 2 %}text-orange-600{% endif %}"
           >
             {{ r.unique_buyers }} {% if r.unique_buyers >= 2 %}
             <span class="block text-xs text-orange-500">multi-buyer</span>
             {% endif %}
           </td>
-          <td class="px-4 py-3 text-sm text-center font-bold">
+          <td class="text-sm text-center font-bold num">
             {{ r.return_count }}
           </td>
-          <td class="px-4 py-3 text-sm text-right font-mono">
+          <td class="text-sm text-right num">
             ${{ "%.2f"|format(r.total_refund) }}
           </td>
           <td
-            class="px-4 py-3 text-sm text-right font-mono {% if r.total_commission > 0 %}text-red-600 font-bold{% endif %}"
+            class="text-sm text-right num {% if r.total_commission > 0 %}text-red-600 font-bold{% endif %}"
           >
             ${{ "%.2f"|format(r.total_commission) }}
           </td>
-          <td class="px-4 py-3 text-center">
+          <td class="text-center">
             <span
-              class="inline-block px-2 py-1 rounded text-xs font-bold {% if r.max_score >= 60 %}badge-critical {% elif r.max_score >= 40 %}badge-high {% elif r.max_score >= 20 %}badge-medium {% else %}badge-low{% endif %}"
+              class="inline-block px-2 py-1 rounded text-xs font-bold num badge-{{ 'critical' if r.max_score >= 60 else 'high' if r.max_score >= 40 else 'medium' if r.max_score >= 20 else 'low' }}"
               >{{ r.max_score }}</span
             >
           </td>
-          <td class="px-4 py-3 text-xs text-slate-600">
+          <td class="text-xs text-brand-sage">
             {% for b in (r.buyers or '').split(',')[:3] if b %}
             <span class="block">@{{ b.strip() }}</span>
             {% endfor %} {% if (r.buyers or '').split(',')|length > 3 %}
-            <span class="text-slate-400"
+            <span class="text-brand-sage/60"
               >+{{ (r.buyers or '').split(',')|length - 3 }} more</span
             >
             {% endif %}
           </td>
-          <td class="px-4 py-3 text-xs text-slate-600">
+          <td class="text-xs text-brand-sage">
             {% for c in (r.creators or '').split(',')[:2] if c %}@{{ c.strip()
             }} {% endfor %}
           </td>
-          <td class="px-4 py-3 text-xs text-slate-500">
+          <td class="text-xs text-brand-sage">
             {% for reason in (r.reasons or '').split(',')[:2] %}
             <span class="block">{{ reason.strip() }}</span>
             {% endfor %}
