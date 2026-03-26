@@ -157,6 +157,7 @@ self_buys.append(r) %}{% endif %}{% endif %}{% endfor %} {% if self_buys %}
           <th class="text-right">Commission</th>
           <th>Why Flagged</th>
           <th>Status</th>
+          <th></th>
           <th class="text-center">Decision</th>
         </tr>
       </thead>
@@ -208,6 +209,9 @@ self_buys.append(r) %}{% endif %}{% endif %}{% endfor %} {% if self_buys %}
             {% endif %}
           </td>
           <td class="text-xs text-brand-sage">{{ r.merged_statuses }}</td>
+          <td class="text-xs" onclick="event.stopPropagation()">
+            <a href="/return/{{ r.id }}" class="btn btn-xs btn-ghost text-brand-sage hover:text-brand-dark">Detail →</a>
+          </td>
           <td class="text-center" onclick="event.stopPropagation()">
             {% if r.user_action %}
             <span
