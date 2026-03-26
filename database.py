@@ -543,3 +543,65 @@ def get_dashboard_stats():
         "total_actions": total_actions["cnt"] if total_actions else 0,
         "pending_critical_high": pending["cnt"] if pending else 0,
     }
+
+
+
+def get_return_detail(flagged_id):
+    """Get a single flagged return + all related rows for the detail page."""
+    conn = get_db()
+
+    row = conn.execute(
+        "SELECT * FROM flagged_returns WHERE id = ?", (flagged_id,)
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        return None
+
+    r = dict(row)
+
+    # All other returns by the same buyer in this run
+    same_buyer = conn.execute(
+        """SELECT * FROM flagged_returns
+           WHERE run_id = ? AND buyer_username = ? AND id != ?
+           ORDER BY fraud_score DESC""",
+        (r["run_id"], r["buyer_username"], flagged_id)
+    ).fetchall()
+
+    # All other return requests on the same order_id (duplicate attempts)
+    same_order = conn.execute(
+        """SELECT * FROM flagged_returns
+           WHERE run_id = ? AND order_id = ? AND id != ?
+           ORDER BY fraud_score DESC""",
+        (r["run_id"], r["order_id"], flagged_id)
+    ).fetchall()
+
+    # All returns from the same creator in this run
+    same_creator = conn.execute(
+        """SELECT * FROM flagged_returns
+           WHERE run_id = ? AND creator = ? AND creator != '' AND id != ?
+           ORDER BY fraud_score DESC LIMIT 20""",
+        (r["run_id"], r["creator"], flagged_id)
+    ).fetchall() if r.get("creator") else []
+
+    # All returns from the same zipcode in this run
+    same_zip = conn.execute(
+        """SELECT * FROM flagged_returns
+           WHERE run_id = ? AND zipcode = ? AND zipcode != '' AND id != ?
+           ORDER BY fraud_score DESC LIMIT 10""",
+        (r["run_id"], r["zipcode"], flagged_id)
+    ).fetchall() if r.get("zipcode") else []
+
+    run = conn.execute("SELECT * FROM runs WHERE id = ?", (r["run_id"],)).fetchone()
+
+    conn.close()
+
+    return {
+        "flagged": r,
+        "run": dict(run) if run else {},
+        "same_buyer": [dict(x) for x in same_buyer],
+        "same_order": [dict(x) for x in same_order],
+        "same_creator": [dict(x) for x in same_creator],
+        "same_zip": [dict(x) for x in same_zip],
+    }
+    
