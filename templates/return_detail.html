@@ -1,0 +1,517 @@
+{% extends "base.html" %}
+{% block title %}Return Detail — @{{ flagged.buyer_username }}{% endblock %}
+{% block content %}
+
+{# ── Flag rule explanations ── #}
+{% set RULE_EXPLAIN = {
+  "SELF-BUY": ("Creator is buying their own product to earn commission then returning it — pure commission theft.", "🕵️"),
+  "SOCK PUPPET": ("Multiple different accounts share the same phone number or recipient name — likely the same real person using fake accounts.", "🎭"),
+  "COMMISSION ALREADY PAID": ("The affiliate commission was already paid out before this return was filed. The brand lost the refund AND the commission.", "💸"),
+  "Buyer return rate": ("This buyer returns more than half of everything they buy — far above normal. Consistent abuse pattern.", "🔁"),
+  "Repeat returner": ("This buyer has returned multiple orders. Not a one-off — a pattern.", "🔁"),
+  "Creator": ("This creator's customers return at an unusually high rate — could mean fake orders, misleading promos, or coordinated fraud.", "📣"),
+  "Return": ("Return was filed after the 14-day commission window closed, meaning commission was already locked and paid.", "📅"),
+  "near commission": ("Return filed suspiciously close to the commission release date — possibly timed to still get the product and refund.", "⏰"),
+  "Suspicious reason": ("'Missing items' or 'Missing package' claims cluster together — a known pattern for keeping product while getting a refund.", "🎁"),
+  "Zip": ("Multiple 'missing items' returns from the same zip code — coordinated fraud from a small area.", "📍"),
+  "hotspot": ("This zip code has a return rate 3x higher than average with at least 3 returns — a fraud hotspot.", "🔥"),
+  "BNPL": ("Buy Now Pay Later payment — used by fraud rings to get product with zero upfront risk before returning.", "💳"),
+  "Duplicate return": ("The same order has multiple return requests filed — trying to get refunded more than once.", "📋"),
+  "Address has": ("Multiple returns shipped to the exact same address — possibly one household making coordinated returns.", "🏠"),
+  "State": ("This state's return rate is more than double the average — geographic anomaly.", "🗺️"),
+  "concentration": ("This creator's returns are heavily concentrated in one state — unusual for organic sales, suggests fake order farms.", "📌"),
+  "Same-day return": ("Return filed on the same day the order was delivered — product may have never been opened or intended to keep.", "⚡"),
+} %}
+
+{% macro explain_flag(flag) %}
+  {% for key, val in RULE_EXPLAIN.items() %}
+    {% if key in flag %}
+      <div class="flex gap-3 p-3 rounded-xl bg-base-200/60 border border-base-300">
+        <span class="text-xl mt-0.5">{{ val[1] }}</span>
+        <div>
+          <p class="text-xs font-bold text-brand-dark uppercase tracking-wide mb-1">{{ flag }}</p>
+          <p class="text-sm text-brand-sage leading-relaxed">{{ val[0] }}</p>
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+{% endmacro %}
+
+{# ── Back nav ── #}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/results/{{ flagged.run_id }}" class="btn btn-ghost btn-sm gap-1">
+    ← Back to Results
+  </a>
+  <span class="text-brand-sage text-sm">/</span>
+  <span class="text-brand-dark text-sm font-medium">@{{ flagged.buyer_username }}</span>
+  <span class="ml-auto">
+    {% if flagged.user_action %}
+      <span class="badge badge-lg {% if flagged.user_action == 'REJECT' %}badge-error{% elif flagged.user_action == 'APPROVE' %}badge-success{% elif flagged.user_action == 'ESCALATE' %}badge-warning{% else %}badge-info{% endif %}">
+        {{ flagged.user_action }}
+      </span>
+    {% endif %}
+  </span>
+</div>
+
+{# ── Hero header ── #}
+<div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
+  <div class="card-body p-6">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <span class="inline-block px-3 py-1 rounded-lg text-sm font-bold badge-{{ flagged.risk_level|lower }}">
+            {{ flagged.risk_level }}
+          </span>
+          <span class="text-3xl font-bold num text-brand-dark">{{ flagged.fraud_score }}</span>
+          <span class="text-brand-sage text-sm">fraud score</span>
+        </div>
+        <h1 class="text-2xl font-bold text-brand-dark">@{{ flagged.buyer_username }}</h1>
+        <p class="text-brand-sage text-sm mt-1">
+          Order <span class="num font-medium text-brand-dark">{{ flagged.order_id }}</span>
+          {% if flagged.creator %} · via @<span class="font-medium text-brand-dark">{{ flagged.creator }}</span>{% endif %}
+          {% if flagged.time_requested %} · {{ flagged.time_requested }}{% endif %}
+        </p>
+      </div>
+      <div class="flex flex-col items-end gap-2">
+        <div class="text-right">
+          <p class="text-xs text-brand-sage">Refund at risk</p>
+          <p class="text-2xl font-bold text-red-600 num">${{ "%.2f"|format(flagged.refund_amount) }}</p>
+        </div>
+        {% if flagged.commission_at_risk > 0 %}
+        <div class="text-right">
+          <p class="text-xs text-brand-sage">Commission at risk</p>
+          <p class="text-lg font-bold text-orange-600 num">${{ "%.2f"|format(flagged.commission_at_risk) }}</p>
+        </div>
+        {% endif %}
+        <div class="flex gap-2 mt-2" id="action-area">
+          {% if flagged.user_action %}
+            <span class="badge badge-lg {% if flagged.user_action == 'REJECT' %}badge-error{% elif flagged.user_action == 'APPROVE' %}badge-success{% elif flagged.user_action == 'ESCALATE' %}badge-warning{% else %}badge-info{% endif %}" id="action-badge">
+              {{ flagged.user_action }}
+            </span>
+          {% else %}
+            <button onclick="takeAction({{ flagged.id }}, 'APPROVE')" class="btn btn-success btn-sm">✓ Approve</button>
+            <button onclick="takeAction({{ flagged.id }}, 'REJECT')" class="btn btn-error btn-sm">✗ Reject</button>
+            <button onclick="takeAction({{ flagged.id }}, 'ESCALATE')" class="btn btn-warning btn-sm">↑ Escalate</button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# system recommendation bar #}
+    <div class="mt-4 flex items-center gap-3 p-3 rounded-xl bg-brand-green/5 border border-brand-green/15">
+      <span class="text-brand-green font-bold text-xs uppercase tracking-wide">System Recommendation</span>
+      <span class="font-bold text-brand-dark">{{ flagged.recommended_action }}</span>
+      <span class="text-brand-sage text-xs ml-auto">{{ flagged.flags.split(' | ')|length }} flag{% if flagged.flags.split(' | ')|length != 1 %}s{% endif %} triggered</span>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  {# ── LEFT: Flags + Explanations ── #}
+  <div class="lg:col-span-2 space-y-6">
+
+    {# Flags explained #}
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+      <div class="card-body p-5">
+        <h2 class="font-bold text-brand-dark mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
+          Why This Return Was Flagged
+        </h2>
+        <div class="space-y-3">
+          {% if flagged.flags %}
+            {% for flag in flagged.flags.split(' | ') %}
+              {{ explain_flag(flag) }}
+            {% endfor %}
+          {% else %}
+            <p class="text-brand-sage text-sm">No flags recorded.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ── RAW DATA: The flagged return row ── #}
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+      <div class="card-body p-5">
+        <h2 class="font-bold text-brand-dark mb-1 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+          Raw Return Record
+        </h2>
+        <p class="text-xs text-brand-sage mb-4">Exact data from your Return Raw CSV that triggered this flag</p>
+
+        <div class="overflow-x-auto">
+          <table class="table table-sm text-xs w-full">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Value</th>
+                <th>Row Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% set return_fields = [
+                ("Order ID", flagged.order_id, "Return Raw CSV"),
+                ("Return Order ID", flagged.return_order_id, "Return Raw CSV"),
+                ("Buyer Username", flagged.buyer_username, "Return Raw CSV"),
+                ("Product", flagged.product, "Return Raw CSV"),
+                ("Return Reason", flagged.return_reason, "Return Raw CSV"),
+                ("Return Status", flagged.return_status, "Return Raw CSV"),
+                ("Return Sub Status", flagged.return_sub_status, "Return Raw CSV"),
+                ("Refund Amount", "$" ~ "%.2f"|format(flagged.refund_amount), "Return Raw CSV"),
+                ("Time Requested", flagged.time_requested, "Return Raw CSV"),
+                ("Buyer Note", flagged.buyer_note, "Return Raw CSV"),
+                ("Payment Method", flagged.payment_method, "All Orders CSV"),
+                ("State", flagged.state, "All Orders CSV"),
+                ("City", flagged.city, "All Orders CSV"),
+                ("Zipcode", flagged.zipcode, "All Orders CSV"),
+                ("Days Since Delivery", flagged.days_since_delivery, "Calculated"),
+                ("Commission Paid?", flagged.commission_paid, "Affiliate CSV"),
+                ("Creator", flagged.creator, "Affiliate CSV"),
+                ("Commission at Risk", "$" ~ "%.2f"|format(flagged.commission_at_risk), "Affiliate CSV"),
+              ] %}
+              {% for field, value, source in return_fields %}
+              {% if value and value != "" and value != "$0.00" %}
+              <tr class="{% if field in ['Return Reason', 'Return Status', 'Commission Paid?'] and value %}bg-yellow-50/40{% endif %}">
+                <td class="font-semibold text-brand-sage w-48">{{ field }}</td>
+                <td class="num font-medium text-brand-dark">
+                  {% if field == "Commission Paid?" and value == "YES" %}
+                    <span class="text-red-600 font-bold">{{ value }} ⚠️</span>
+                  {% elif field == "Return Reason" %}
+                    <span class="badge badge-sm badge-warning">{{ value }}</span>
+                  {% elif field == "Buyer Username" %}
+                    @{{ value }}
+                  {% else %}
+                    {{ value }}
+                  {% endif %}
+                </td>
+                <td class="text-brand-sage/60 italic">{{ source }}</td>
+              </tr>
+              {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {# ── RELATED: Same Order (duplicate attempts) ── #}
+    {% if same_order %}
+    <div class="card bg-orange-50 border border-orange-200 shadow-sm">
+      <div class="card-body p-5">
+        <h2 class="font-bold text-orange-800 mb-1 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-orange-500 inline-block"></span>
+          ⚠️ Duplicate Return Attempts on Same Order ({{ same_order|length }})
+        </h2>
+        <p class="text-xs text-orange-600 mb-4">These are additional return requests on the exact same Order ID — the buyer tried to get refunded multiple times.</p>
+        <div class="space-y-3">
+          {% for r in same_order %}
+          <div class="bg-white rounded-xl border border-orange-200 p-4">
+            <div class="flex justify-between items-start mb-2">
+              <div>
+                <span class="badge badge-sm badge-warning">{{ r.risk_level }}</span>
+                <span class="num font-bold text-sm ml-2">Score: {{ r.fraud_score }}</span>
+              </div>
+              <span class="num text-xs text-brand-sage">Return ID: {{ r.return_order_id }}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div><span class="text-brand-sage">Reason:</span> <span class="font-medium">{{ r.return_reason }}</span></div>
+              <div><span class="text-brand-sage">Status:</span> <span class="font-medium">{{ r.return_status }}</span></div>
+              <div><span class="text-brand-sage">Requested:</span> <span class="num">{{ r.time_requested or "—" }}</span></div>
+              <div><span class="text-brand-sage">Refund:</span> <span class="num font-bold text-red-600">${{ "%.2f"|format(r.refund_amount) }}</span></div>
+            </div>
+            {% if r.buyer_note %}
+            <div class="mt-2 text-xs bg-yellow-50 rounded p-2"><span class="font-semibold">Buyer Note:</span> {{ r.buyer_note }}</div>
+            {% endif %}
+            <a href="/return/{{ r.id }}" class="btn btn-xs btn-ghost mt-2">View Detail →</a>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── RELATED: Same Buyer's Other Returns ── #}
+    {% if same_buyer %}
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+      <div class="card-body p-5">
+        <h2 class="font-bold text-brand-dark mb-1 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-purple-500 inline-block"></span>
+          @{{ flagged.buyer_username }}'s Other Returns This Run ({{ same_buyer|length }})
+        </h2>
+        <p class="text-xs text-brand-sage mb-4">All other flagged returns from this same buyer in the current analysis — shows the full pattern.</p>
+
+        <div class="overflow-x-auto">
+          <table class="table table-xs">
+            <thead>
+              <tr>
+                <th>Risk</th>
+                <th>Score</th>
+                <th>Order ID</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th class="text-right">Refund</th>
+                <th>Requested</th>
+                <th>Flags</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in same_buyer %}
+              <tr class="{% if r.risk_level == 'CRITICAL' %}risk-critical{% elif r.risk_level == 'HIGH' %}risk-high{% endif %}">
+                <td><span class="badge badge-xs badge-{{ r.risk_level|lower }}">{{ r.risk_level }}</span></td>
+                <td class="num font-bold">{{ r.fraud_score }}</td>
+                <td class="num text-xs text-brand-sage">{{ r.order_id[-12:] }}…</td>
+                <td class="text-xs">{{ r.return_reason }}</td>
+                <td class="text-xs text-brand-sage">{{ r.return_status }}</td>
+                <td class="num text-right text-red-600 font-bold">${{ "%.2f"|format(r.refund_amount) }}</td>
+                <td class="num text-xs text-brand-sage">{{ r.time_requested or "—" }}</td>
+                <td class="text-xs" style="max-width:200px">
+                  {% for flag in r.flags.split(' | ')[:2] if r.flags %}
+                  <span class="flag-tag flag-default">{{ flag[:40] }}</span>
+                  {% endfor %}
+                </td>
+                <td><a href="/return/{{ r.id }}" class="btn btn-xs btn-ghost">→</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-3 p-3 bg-base-200 rounded-xl text-xs flex gap-4">
+          <span class="text-brand-sage">Total from this buyer:</span>
+          <span class="num font-bold text-red-600">${{ "%.2f"|format(same_buyer|sum(attribute='refund_amount') + flagged.refund_amount) }}</span>
+          <span class="text-brand-sage ml-2">across {{ same_buyer|length + 1 }} returns</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── RELATED: Same Creator ── #}
+    {% if same_creator %}
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+      <div class="card-body p-5">
+        <h2 class="font-bold text-brand-dark mb-1 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-green-600 inline-block"></span>
+          Other Returns via @{{ flagged.creator }} ({{ same_creator|length }})
+        </h2>
+        <p class="text-xs text-brand-sage mb-4">All other flagged returns that came through this same creator — helps identify if the creator is actively promoting fraud.</p>
+
+        <div class="overflow-x-auto">
+          <table class="table table-xs">
+            <thead>
+              <tr>
+                <th>Risk</th>
+                <th>Score</th>
+                <th>Buyer</th>
+                <th>Reason</th>
+                <th class="text-right">Refund</th>
+                <th class="text-right">Commission</th>
+                <th>Flags</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in same_creator %}
+              <tr class="{% if r.risk_level == 'CRITICAL' %}risk-critical{% elif r.risk_level == 'HIGH' %}risk-high{% endif %}">
+                <td><span class="badge badge-xs badge-{{ r.risk_level|lower }}">{{ r.risk_level }}</span></td>
+                <td class="num font-bold">{{ r.fraud_score }}</td>
+                <td class="font-medium text-sm">@{{ r.buyer_username }}</td>
+                <td class="text-xs">{{ r.return_reason }}</td>
+                <td class="num text-right text-red-600 font-bold">${{ "%.2f"|format(r.refund_amount) }}</td>
+                <td class="num text-right {% if r.commission_at_risk > 0 %}text-orange-600 font-bold{% endif %}">${{ "%.2f"|format(r.commission_at_risk) }}</td>
+                <td class="text-xs" style="max-width:180px">
+                  {% for flag in r.flags.split(' | ')[:2] if r.flags %}
+                  <span class="flag-tag flag-default">{{ flag[:35] }}</span>
+                  {% endfor %}
+                </td>
+                <td><a href="/return/{{ r.id }}" class="btn btn-xs btn-ghost">→</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-3 p-3 bg-base-200 rounded-xl text-xs flex flex-wrap gap-4">
+          <span class="text-brand-sage">Total via @{{ flagged.creator }}:</span>
+          <span class="num font-bold text-red-600">${{ "%.2f"|format(same_creator|sum(attribute='refund_amount') + flagged.refund_amount) }} refunds</span>
+          <span class="num font-bold text-orange-600">${{ "%.2f"|format(same_creator|sum(attribute='commission_at_risk') + flagged.commission_at_risk) }} commission</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── RELATED: Same Zip ── #}
+    {% if same_zip %}
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+      <div class="card-body p-5">
+        <h2 class="font-bold text-brand-dark mb-1 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-yellow-500 inline-block"></span>
+          Other Returns from Zip {{ flagged.zipcode }} ({{ same_zip|length }})
+        </h2>
+        <p class="text-xs text-brand-sage mb-4">Returns from the exact same zip code — a cluster here suggests coordinated fraud from one area.</p>
+
+        <div class="overflow-x-auto">
+          <table class="table table-xs">
+            <thead>
+              <tr>
+                <th>Risk</th>
+                <th>Buyer</th>
+                <th>Reason</th>
+                <th>City</th>
+                <th class="text-right">Refund</th>
+                <th>Requested</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in same_zip %}
+              <tr>
+                <td><span class="badge badge-xs badge-{{ r.risk_level|lower }}">{{ r.risk_level }}</span></td>
+                <td class="font-medium text-sm">@{{ r.buyer_username }}</td>
+                <td class="text-xs">{{ r.return_reason }}</td>
+                <td class="text-xs text-brand-sage">{{ r.city }}</td>
+                <td class="num text-right text-red-600 font-bold">${{ "%.2f"|format(r.refund_amount) }}</td>
+                <td class="num text-xs text-brand-sage">{{ r.time_requested or "—" }}</td>
+                <td><a href="/return/{{ r.id }}" class="btn btn-xs btn-ghost">→</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  {# ── RIGHT SIDEBAR: Quick stats + buyer profile ── #}
+  <div class="space-y-4">
+
+    {# Buyer profile #}
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+      <div class="card-body p-5">
+        <p class="section-label mb-4">Buyer Profile</p>
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between">
+            <span class="text-brand-sage">Username</span>
+            <span class="font-bold text-brand-dark">@{{ flagged.buyer_username }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-brand-sage">Total Orders</span>
+            <span class="num font-bold">{{ flagged.buyer_unique_orders }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-brand-sage">Total Returns</span>
+            <span class="num font-bold text-red-600">{{ flagged.buyer_unique_returns }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-brand-sage">Return Rate</span>
+            <span class="num font-bold {% if flagged.buyer_return_rate and flagged.buyer_return_rate|replace('%','')|float > 30 %}text-red-600{% endif %}">
+              {{ flagged.buyer_return_rate or "—" }}
+            </span>
+          </div>
+          {% if flagged.payment_method %}
+          <div class="flex justify-between">
+            <span class="text-brand-sage">Payment</span>
+            <span class="text-xs text-right">{{ flagged.payment_method }}</span>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if same_buyer %}
+        <div class="divider my-3 text-xs">This Run</div>
+        <div class="flex justify-between text-sm">
+          <span class="text-brand-sage">Returns flagged</span>
+          <span class="num font-bold text-red-600">{{ same_buyer|length + 1 }}</span>
+        </div>
+        <div class="flex justify-between text-sm mt-2">
+          <span class="text-brand-sage">Total exposure</span>
+          <span class="num font-bold text-red-600">${{ "%.2f"|format(same_buyer|sum(attribute='refund_amount') + flagged.refund_amount) }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Location #}
+    {% if flagged.state or flagged.zipcode %}
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+      <div class="card-body p-5">
+        <p class="section-label mb-3">Location</p>
+        <div class="space-y-2 text-sm">
+          {% if flagged.city %}<div class="flex justify-between"><span class="text-brand-sage">City</span><span>{{ flagged.city }}</span></div>{% endif %}
+          {% if flagged.state %}<div class="flex justify-between"><span class="text-brand-sage">State</span><span class="font-bold">{{ flagged.state }}</span></div>{% endif %}
+          {% if flagged.zipcode %}<div class="flex justify-between"><span class="text-brand-sage">Zip</span><span class="num">{{ flagged.zipcode }}</span></div>{% endif %}
+          {% if same_zip %}
+          <div class="mt-2 p-2 bg-yellow-50 rounded-lg text-xs text-yellow-800 font-medium">
+            ⚠️ {{ same_zip|length + 1 }} returns from this zip
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Creator snapshot #}
+    {% if flagged.creator %}
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+      <div class="card-body p-5">
+        <p class="section-label mb-3">Creator</p>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-brand-sage">Username</span>
+            <span class="font-bold">@{{ flagged.creator }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-brand-sage">Commission Paid?</span>
+            <span class="{% if flagged.commission_paid == 'YES' %}text-red-600 font-bold{% endif %}">{{ flagged.commission_paid }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-brand-sage">At Risk</span>
+            <span class="num font-bold {% if flagged.commission_at_risk > 0 %}text-orange-600{% endif %}">${{ "%.2f"|format(flagged.commission_at_risk) }}</span>
+          </div>
+          {% if same_creator %}
+          <div class="mt-2 p-2 bg-orange-50 rounded-lg text-xs text-orange-800 font-medium">
+            📣 {{ same_creator|length + 1 }} total returns via this creator
+          </div>
+          {% endif %}
+        </div>
+        <a href="/creator-data/{{ flagged.run_id }}" class="btn btn-ghost btn-xs w-full mt-3">View Creator Data →</a>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Navigate prev/next #}
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+      <div class="card-body p-4">
+        <p class="section-label mb-3">Navigation</p>
+        <div class="space-y-2">
+          <a href="/results/{{ flagged.run_id }}" class="btn btn-outline btn-sm w-full">← All Results</a>
+          <a href="/results/{{ flagged.run_id }}?risk=CRITICAL" class="btn btn-ghost btn-sm w-full text-red-600">CRITICAL only</a>
+          <a href="/results/{{ flagged.run_id }}?risk=HIGH" class="btn btn-ghost btn-sm w-full text-orange-600">HIGH only</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function takeAction(id, action) {
+  fetch("/action", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: id, action: action }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === "ok") {
+        const cls = { APPROVE: "badge-success", REJECT: "badge-error", ESCALATE: "badge-warning", INVESTIGATE: "badge-info" };
+        document.getElementById("action-area").innerHTML =
+          `<span class="badge badge-lg ${cls[action] || 'badge-ghost'}">${action}</span>`;
+      }
+    });
+}
+</script>
+{% endblock %}
