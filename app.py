@@ -173,6 +173,14 @@ def overview(run_id):
 
     return render_template("overview.html", run=run, data=data)
 
+@app.route("/return/<int:flagged_id>")
+   def return_detail(flagged_id):
+       detail = db.get_return_detail(flagged_id)
+       if not detail:
+           flash("Return not found", "error")
+           return redirect(url_for("index"))
+       return render_template("return_detail.html", **detail)
+
 
 @app.route("/action", methods=["POST"])
 def take_action():
