@@ -225,11 +225,46 @@ endblock %} {% block content %}
 </div>
 {% endblock %} {% block scripts %}
 <script>
-  document.getElementById("uploadForm").addEventListener("submit", function () {
-    document.getElementById("submitBtn").disabled = true;
-    document.getElementById("submitBtn").textContent = "Processing...";
-    document.getElementById("submitBtn").classList.add("btn-disabled");
-    document.getElementById("loadingOverlay").classList.remove("hidden");
+  document.getElementById("uploadForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const btn = document.getElementById("submitBtn");
+    const overlay = document.getElementById("loadingOverlay");
+
+    btn.disabled = true;
+    btn.textContent = "Uploading files...";
+    btn.classList.add("btn-disabled");
+    overlay.classList.remove("hidden");
+
+    const formData = new FormData(this);
+
+    try {
+      // POST the files — server saves them instantly and returns job redirect
+      const response = await fetch("/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      // Server redirects to /processing/<job_id>
+      if (response.redirected) {
+        window.location.href = response.url;
+      } else if (response.ok) {
+        window.location.href = response.url;
+      } else {
+        const text = await response.text();
+        btn.disabled = false;
+        btn.textContent = "Run Fraud Analysis";
+        btn.classList.remove("btn-disabled");
+        overlay.classList.add("hidden");
+        alert("Upload failed. Please try again.");
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "Run Fraud Analysis";
+      btn.classList.remove("btn-disabled");
+      overlay.classList.add("hidden");
+      alert("Network error: " + err.message);
+    }
   });
 </script>
 {% endblock %}
