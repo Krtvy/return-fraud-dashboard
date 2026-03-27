@@ -12,7 +12,7 @@
           <div class="pulse-dot"></div>
         </div>
         <p class="text-brand-sage text-sm mb-6">
-          Upload your 3 TikTok raw CSV exports. Files are processed <strong>entirely in your browser</strong> — nothing is uploaded to a server.
+          Upload your 3 TikTok raw CSV exports. Files are processed entirely in your browser — nothing is uploaded to the server until analysis is complete.
         </p>
 
         <div class="space-y-4" id="fileZones">
@@ -23,6 +23,7 @@
               <span class="text-brand-sage font-normal ml-2">Seller Center → Returns</span>
             </label>
             <input type="file" id="file-return" accept=".csv" class="file-input file-input-bordered file-input-sm w-full" />
+            <div id="status-return" class="hidden mt-2 text-xs text-brand-sage"></div>
           </div>
 
           <!-- Affiliate Raw -->
@@ -32,6 +33,7 @@
               <span class="text-brand-sage font-normal ml-2">Affiliate Center → Orders</span>
             </label>
             <input type="file" id="file-affiliate" accept=".csv" class="file-input file-input-bordered file-input-sm w-full" />
+            <div id="status-affiliate" class="hidden mt-2 text-xs text-brand-sage"></div>
           </div>
 
           <!-- All Orders Raw -->
@@ -41,29 +43,32 @@
               <span class="text-brand-sage font-normal ml-2">Seller Center → All Orders</span>
             </label>
             <input type="file" id="file-orders" accept=".csv" class="file-input file-input-bordered file-input-sm w-full" />
+            <div id="status-orders" class="hidden mt-2 text-xs text-brand-sage"></div>
           </div>
         </div>
 
-        <button id="runBtn" onclick="startAnalysis()" class="btn btn-primary w-full mt-6 text-sm" disabled>
-          Run Fraud Analysis
+        <button id="runBtn" onclick="runAnalysis()" class="btn btn-primary w-full mt-6 text-sm" disabled>
+          Select all 3 files to begin
         </button>
 
         <!-- Progress -->
-        <div id="progressBox" class="hidden mt-6">
+        <div id="progressArea" class="hidden mt-6 space-y-3">
           <div class="alert bg-brand-green/5 border border-brand-green/10">
             <span class="loading loading-spinner loading-md text-brand-green"></span>
             <div class="w-full">
-              <p id="progressMsg" class="text-brand-dark font-medium text-sm">Starting...</p>
+              <p id="progressTitle" class="text-brand-dark font-medium text-sm">Starting analysis...</p>
               <div class="w-full bg-base-300 rounded-full h-1.5 mt-2">
-                <div id="progressBar" class="bg-brand-green h-1.5 rounded-full transition-all" style="width:0%"></div>
+                <div id="progressBar" class="bg-brand-green h-1.5 rounded-full transition-all duration-500" style="width:0%"></div>
               </div>
+              <p id="progressSub" class="text-brand-sage text-xs mt-1">0%</p>
             </div>
           </div>
         </div>
 
-        <!-- Error -->
-        <div id="errorBox" class="hidden mt-4 alert alert-error text-sm">
-          <span id="errorMsg"></span>
+        <div id="errorArea" class="hidden mt-4">
+          <div class="alert alert-error text-sm">
+            <span id="errorMsg"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -77,11 +82,26 @@
         <p class="section-label mb-4">Latest Run</p>
         {% set last = dash.recent_runs[0] %}
         <div class="space-y-3">
-          <div class="flex justify-between text-sm"><span class="text-brand-sage">Date</span><span class="text-brand-dark num text-xs">{{ last.run_date[:16] }}</span></div>
-          <div class="flex justify-between text-sm"><span class="text-brand-sage">MagAsha Returns</span><span class="text-brand-dark font-semibold num">{{ last.mag_returns }}</span></div>
-          <div class="flex justify-between text-sm"><span class="text-brand-sage">Critical</span><span class="badge badge-error badge-sm num">{{ last.critical_count }}</span></div>
-          <div class="flex justify-between text-sm"><span class="text-brand-sage">High</span><span class="badge badge-warning badge-sm num">{{ last.high_count }}</span></div>
-          <div class="flex justify-between text-sm"><span class="text-brand-sage">At-Risk $</span><span class="text-red-600 font-bold num">${{ "%.2f"|format(last.at_risk_refund) }}</span></div>
+          <div class="flex justify-between text-sm">
+            <span class="text-brand-sage">Date</span>
+            <span class="text-brand-dark num text-xs">{{ last.run_date[:16] }}</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-brand-sage">MagAsha Returns</span>
+            <span class="text-brand-dark font-semibold num">{{ last.mag_returns }}</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-brand-sage">Critical</span>
+            <span class="badge badge-error badge-sm num">{{ last.critical_count }}</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-brand-sage">High</span>
+            <span class="badge badge-warning badge-sm num">{{ last.high_count }}</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-brand-sage">At-Risk $</span>
+            <span class="text-red-600 font-bold num">${{ "%.2f"|format(last.at_risk_refund) }}</span>
+          </div>
           <a href="/results/{{ last.id }}" class="btn btn-primary btn-sm w-full mt-3">View Results &rarr;</a>
         </div>
       </div>
@@ -97,6 +117,15 @@
       </div>
     </div>
     {% endif %}
+
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-5">
+        <p class="section-label mb-3">How it works</p>
+        <p class="text-xs text-brand-sage leading-relaxed">
+          Your CSV files <strong>never leave your computer</strong> during analysis. The browser reads and processes them locally using the same 16 fraud rules. Only the final results (a few KB) are sent to the server to save.
+        </p>
+      </div>
+    </div>
 
     <div class="card bg-base-100 shadow-sm border border-base-300">
       <div class="card-body p-5">
@@ -121,82 +150,839 @@
 
 {% endblock %}
 {% block scripts %}
-<script src="/static/detector.js"></script>
 <script>
-// Enable run button when all 3 files selected
-['file-return','file-affiliate','file-orders'].forEach(id => {
-  document.getElementById(id).addEventListener('change', checkReady);
+// ── File state ──
+let files = { ret: null, aff: null, ord: null };
+
+document.getElementById('file-return').addEventListener('change', e => {
+  files.ret = e.target.files[0];
+  showFileStatus('return', files.ret);
+  updateBtn();
 });
-function checkReady() {
-  const ready = ['file-return','file-affiliate','file-orders'].every(id => document.getElementById(id).files.length > 0);
-  document.getElementById('runBtn').disabled = !ready;
+document.getElementById('file-affiliate').addEventListener('change', e => {
+  files.aff = e.target.files[0];
+  showFileStatus('affiliate', files.aff);
+  updateBtn();
+});
+document.getElementById('file-orders').addEventListener('change', e => {
+  files.ord = e.target.files[0];
+  showFileStatus('orders', files.ord);
+  updateBtn();
+});
+
+function showFileStatus(id, file) {
+  const el = document.getElementById('status-' + id);
+  el.classList.remove('hidden');
+  el.textContent = `✓ ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)`;
+  el.classList.add('text-brand-green');
 }
 
-function setProgress(msg, pct) {
-  document.getElementById('progressMsg').textContent = msg;
+function updateBtn() {
+  const btn = document.getElementById('runBtn');
+  if (files.ret && files.aff && files.ord) {
+    btn.disabled = false;
+    btn.textContent = 'Run Fraud Analysis';
+  }
+}
+
+function setProgress(pct, title, sub) {
   document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressTitle').textContent = title;
+  document.getElementById('progressSub').textContent = sub || pct + '%';
+}
+
+// ── CSV Parser ──
+function parseCSV(text) {
+  const lines = text.split('\n');
+  if (!lines.length) return [];
+  // Handle BOM
+  lines[0] = lines[0].replace(/^\uFEFF/, '');
+  const headers = parseCSVLine(lines[0]).map(h => h.trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const vals = parseCSVLine(line);
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = (vals[idx] || '').trim(); });
+    rows.push(row);
+  }
+  return rows;
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i+1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current);
+  return result;
 }
 
 function readFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => resolve(e.target.result);
-    reader.onerror = () => reject(new Error('Failed to read ' + file.name));
+    reader.onerror = reject;
     reader.readAsText(file, 'utf-8');
   });
 }
 
-async function startAnalysis() {
+// ── Detection helpers ──
+const COMMISSION_HOLD_DAYS = 30;
+const PRODUCT_KEYWORDS = ['liposomal magnesium','magnesium + ashwagandha','magnesium+ashwagandha','magasha'];
+const WEIGHTS = {
+  high_buyer_return_rate:25, repeat_returner:20, high_creator_return_rate:20,
+  return_after_commission:30, return_near_commission_window:15, suspicious_reason:10,
+  missing_items_cluster_zip:15, bnpl_payment:5, duplicate_return_attempt:25,
+  repeat_address_returns:15, state_return_anomaly:10, zip_return_hotspot:15,
+  creator_state_concentration:15, creator_self_buy:40, commission_already_paid:25,
+  same_day_return:10, sock_puppet_phone:30, sock_puppet_address:20,
+};
+
+function isTarget(name) {
+  const n = (name||'').toLowerCase();
+  return PRODUCT_KEYWORDS.some(k => n.includes(k));
+}
+
+function parseDollar(val) {
+  if (!val) return 0;
+  const n = parseFloat((val+'').replace(/[$,]/g,''));
+  return isNaN(n) ? 0 : n;
+}
+
+function parseDateDDMM(val) {
+  if (!val) return null;
+  const v = val.trim();
+  // DD/MM/YYYY variants
+  let m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) {
+    const d = new Date(+m[3], +m[2]-1, +m[1]);
+    if (!isNaN(d)) return d;
+  }
+  return null;
+}
+
+function parseDateMMDD(val) {
+  if (!val) return null;
+  const v = val.trim();
+  let m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) {
+    const d = new Date(+m[3], +m[1]-1, +m[2]);
+    if (!isNaN(d)) return d;
+  }
+  return null;
+}
+
+function daysDiff(a, b) {
+  if (!a || !b) return null;
+  return Math.floor((b - a) / 86400000);
+}
+
+function normalizePhone(p) {
+  if (!p) return '';
+  return (p+'').replace(/\D/g,'').slice(-10);
+}
+
+function normalizeName(n) {
+  if (!n) return '';
+  return (n+'').toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
+}
+
+function riskLabel(score) {
+  if (score >= 60) return 'CRITICAL';
+  if (score >= 40) return 'HIGH';
+  if (score >= 20) return 'MEDIUM';
+  return 'LOW';
+}
+
+function recommendedAction(score, reason, status, days) {
+  if (status === 'Completed') return score >= 60 ? 'INVESTIGATE' : 'CLOSED';
+  if ((status||'').toLowerCase().includes('rejected')) return score >= 40 ? 'KEEP REJECTED' : 'REVIEW REJECTION';
+  if (score >= 60) return 'REJECT';
+  if (score >= 40) return 'ESCALATE';
+  if (score >= 20) return 'REVIEW';
+  return 'APPROVE';
+}
+
+// ── Main analysis ──
+async function runAnalysis() {
   const btn = document.getElementById('runBtn');
-  const progressBox = document.getElementById('progressBox');
-  const errorBox = document.getElementById('errorBox');
-  
   btn.disabled = true;
-  errorBox.classList.add('hidden');
-  progressBox.classList.remove('hidden');
+  btn.textContent = 'Analysing...';
+  document.getElementById('progressArea').classList.remove('hidden');
+  document.getElementById('errorArea').classList.add('hidden');
 
   try {
-    setProgress('Reading Return CSV...', 10);
-    const returnText = await readFile(document.getElementById('file-return').files[0]);
-    
-    setProgress('Reading Affiliate CSV...', 25);
-    const affiliateText = await readFile(document.getElementById('file-affiliate').files[0]);
-    
-    setProgress('Reading Orders CSV...', 40);
-    const ordersText = await readFile(document.getElementById('file-orders').files[0]);
+    setProgress(5, 'Reading CSV files...', 'Loading files into browser memory');
+    const [retText, affText, ordText] = await Promise.all([
+      readFile(files.ret), readFile(files.aff), readFile(files.ord)
+    ]);
 
-    setProgress('Running fraud detection rules...', 55);
-    // Small delay to let UI update
-    await new Promise(r => setTimeout(r, 50));
-    
-    const { results, stats, dailyStats, overview } = runDetection(returnText, affiliateText, ordersText);
-    
-    setProgress(`Found ${stats.critical_count} CRITICAL, ${stats.high_count} HIGH. Saving to database...`, 80);
-    await new Promise(r => setTimeout(r, 50));
+    setProgress(15, 'Parsing CSV files...', 'Converting rows to structured data');
+    const returns = parseCSV(retText);
+    const affiliates = parseCSV(affText);
+    const orders = parseCSV(ordText);
 
-    // Send only results (small JSON) to server to save
-    const response = await fetch('/save-results', {
+    setProgress(25, 'Filtering MagAsha products...', `${returns.length} returns, ${affiliates.length} affiliates, ${orders.length} orders loaded`);
+    const magReturnsAll = returns.filter(r => isTarget(r['Product Name']));
+    const magAffiliates = affiliates.filter(r => isTarget(r['Product Name']));
+    const magOrders = orders.filter(r => isTarget(r['Product Name']));
+
+    setProgress(35, 'Building lookups...', `${magReturnsAll.length} MagAsha returns found`);
+    const lookups = buildLookups(returns, affiliates, orders, magReturnsAll, magAffiliates, magOrders);
+
+    const magReturns = magReturnsAll.filter(r => lookups.creatorByOrder[(r['Order ID']||'').trim()]);
+
+    setProgress(50, 'Scoring returns against 16 fraud rules...', `Analysing ${magReturns.length} affiliate returns`);
+    const results = scoreReturns(magReturns, lookups);
+
+    setProgress(70, 'Computing daily stats...', 'Building timeline');
+    const dailyStats = computeDailyStats(magAffiliates, magReturns, lookups);
+
+    setProgress(80, 'Computing overview data...', 'Calculating benchmarks');
+    const overviewData = computeOverview(returns, affiliates, orders, magReturnsAll, magAffiliates, magOrders, lookups);
+
+    setProgress(90, 'Saving results to server...', 'Sending analysis results');
+    const levels = {CRITICAL:[], HIGH:[], MEDIUM:[], LOW:[]};
+    results.forEach(r => levels[r.risk_level].push(r));
+    const critHigh = [...levels.CRITICAL, ...levels.HIGH];
+
+    const stats = {
+      total_returns_all: returns.length,
+      total_affiliates_all: affiliates.length,
+      total_orders_all: orders.length,
+      mag_returns_all: magReturnsAll.length,
+      mag_returns: magReturns.length,
+      mag_affiliates: magAffiliates.length,
+      mag_orders: magOrders.length,
+      critical_count: levels.CRITICAL.length,
+      high_count: levels.HIGH.length,
+      medium_count: levels.MEDIUM.length,
+      low_count: levels.LOW.length,
+      total_refund: results.reduce((s,r) => s + r.refund_amount, 0),
+      total_commission_risk: results.reduce((s,r) => s + r.commission_at_risk, 0),
+      at_risk_refund: critHigh.reduce((s,r) => s + r.refund_amount, 0),
+      at_risk_commission: critHigh.reduce((s,r) => s + r.commission_at_risk, 0),
+      overall_return_rate: lookups.overallReturnRate,
+      self_buy_count: results.filter(r => r.flags.includes('SELF-BUY')).length,
+      sock_puppet_count: new Set(results.filter(r => r.flags.includes('SOCK PUPPET')).map(r => r.buyer_username)).size,
+    };
+
+    const resp = await fetch('/save-results', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ results, stats, dailyStats, overview }),
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({stats, results, dailyStats, overview: overviewData})
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error('Server error: ' + err);
+    const data = await resp.json();
+    if (data.run_id) {
+      setProgress(100, 'Done! Redirecting to results...', 'Analysis complete');
+      setTimeout(() => { window.location.href = '/results/' + data.run_id; }, 800);
+    } else {
+      throw new Error(data.error || 'Save failed');
     }
 
-    const data = await response.json();
-    setProgress('Done! Redirecting to results...', 100);
-    await new Promise(r => setTimeout(r, 500));
-    window.location.href = '/results/' + data.run_id;
-
-  } catch (err) {
-    progressBox.classList.add('hidden');
-    errorBox.classList.remove('hidden');
+  } catch(err) {
+    document.getElementById('progressArea').classList.add('hidden');
+    document.getElementById('errorArea').classList.remove('hidden');
     document.getElementById('errorMsg').textContent = 'Error: ' + err.message;
     btn.disabled = false;
+    btn.textContent = 'Run Fraud Analysis';
   }
+}
+
+// ── Build Lookups ──
+function buildLookups(returns, affiliates, orders, magReturns, magAffiliates, magOrders) {
+  const creatorByOrder = {};
+  const creatorOrdersMap = {};
+  const allCreators = new Set();
+
+  affiliates.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    const creator = (row['Creator Username']||'').trim();
+    if (!oid || !creator) return;
+    creatorByOrder[oid] = {
+      creator,
+      commission_rate: (row['Standard commission rate']||'').trim(),
+      est_commission: parseDollar(row['Est. standard commission payment']),
+      actual_commission: parseDollar(row['Actual Commission Payment']),
+      delivery_time: (row['Order Delivery Time']||'').trim(),
+      commission_paid_time: (row['Time Commission Paid']||'').trim(),
+    };
+    if (isTarget(row['Product Name'])) {
+      if (!creatorOrdersMap[creator]) creatorOrdersMap[creator] = new Set();
+      creatorOrdersMap[creator].add(oid);
+    }
+    allCreators.add(creator.toLowerCase());
+  });
+
+  const addressByOrder = {};
+  orders.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    if (!oid) return;
+    addressByOrder[oid] = {
+      buyer_username: (row['Buyer Username']||'').trim(),
+      recipient: (row['Recipient']||'').trim(),
+      phone: (row['Phone #']||'').trim(),
+      state: (row['State']||'').trim(),
+      city: (row['City']||'').trim(),
+      zipcode: (row['Zipcode']||'').trim(),
+      address: (row['Address Line 1']||'').trim(),
+      payment_method: (row['Payment Method']||'').trim(),
+      delivered_time: (row['Delivered Time']||'').trim(),
+    };
+  });
+
+  const buyerOrders = {};
+  const buyerReturns = {};
+  orders.forEach(row => {
+    const buyer = (row['Buyer Username']||'').trim();
+    const oid = (row['Order ID']||'').trim();
+    if (!buyer || !oid) return;
+    if (!buyerOrders[buyer]) buyerOrders[buyer] = new Set();
+    buyerOrders[buyer].add(oid);
+  });
+  returns.forEach(row => {
+    const buyer = (row['Buyer Username']||'').trim();
+    const oid = (row['Order ID']||'').trim();
+    if (!buyer || !oid) return;
+    if (!buyerReturns[buyer]) buyerReturns[buyer] = new Set();
+    buyerReturns[buyer].add(oid);
+  });
+
+  const buyerReturnRecords = {};
+  magReturns.forEach(row => {
+    const buyer = (row['Buyer Username']||'').trim();
+    const oid = (row['Order ID']||'').trim();
+    if (!buyer) return;
+    if (!buyerReturnRecords[buyer]) buyerReturnRecords[buyer] = [];
+    buyerReturnRecords[buyer].push(oid);
+  });
+
+  const creatorReturnOrders = {};
+  const creatorOrderCount = {};
+  Object.entries(creatorOrdersMap).forEach(([c,s]) => { creatorOrderCount[c] = s.size; });
+  magReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    if (!creatorByOrder[oid]) return;
+    const creator = creatorByOrder[oid].creator;
+    if (!creatorReturnOrders[creator]) creatorReturnOrders[creator] = new Set();
+    creatorReturnOrders[creator].add(oid);
+  });
+
+  const zipReturnsMap = {};
+  magReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    const reason = (row['Return Reason']||'').trim();
+    if (!addressByOrder[oid]) return;
+    const zc = addressByOrder[oid].zipcode;
+    if (!zc) return;
+    if (!zipReturnsMap[zc]) zipReturnsMap[zc] = [];
+    zipReturnsMap[zc].push({order_id: oid, reason, buyer: (row['Buyer Username']||'').trim()});
+  });
+
+  const addrReturns = {};
+  magReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    if (!addressByOrder[oid]) return;
+    const addr = (addressByOrder[oid].address||'').toUpperCase();
+    if (addr.length <= 5) return;
+    if (!addrReturns[addr]) addrReturns[addr] = new Set();
+    addrReturns[addr].add(oid);
+  });
+
+  // Sock puppet
+  const phoneToBuyers = {};
+  const nameToBuyers = {};
+  magReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    const buyer = (row['Buyer Username']||'').trim();
+    if (!addressByOrder[oid] || !buyer) return;
+    const info = addressByOrder[oid];
+    const phone = normalizePhone(info.phone);
+    const name = normalizeName(info.recipient);
+    if (phone && phone.length >= 7) {
+      if (!phoneToBuyers[phone]) phoneToBuyers[phone] = new Set();
+      phoneToBuyers[phone].add(buyer);
+    }
+    if (name && name.length > 3) {
+      if (!nameToBuyers[name]) nameToBuyers[name] = new Set();
+      nameToBuyers[name].add(buyer);
+    }
+  });
+
+  const sockPuppetPhone = {};
+  Object.entries(phoneToBuyers).forEach(([phone, buyers]) => {
+    if (buyers.size >= 2) buyers.forEach(b => { sockPuppetPhone[b] = {phone, buyers}; });
+  });
+  const sockPuppetName = {};
+  Object.entries(nameToBuyers).forEach(([name, buyers]) => {
+    if (buyers.size >= 2) buyers.forEach(b => { sockPuppetName[b] = {name, buyers}; });
+  });
+
+  // Self-buy
+  const selfBuyOrders = new Set();
+  magReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    const buyer = (row['Buyer Username']||'').trim();
+    if (!creatorByOrder[oid]) return;
+    const creator = creatorByOrder[oid].creator;
+    if (buyer.toLowerCase() === creator.toLowerCase() || allCreators.has(buyer.toLowerCase())) {
+      selfBuyOrders.add(oid);
+    }
+  });
+
+  // Geographic
+  const stateOrders = {};
+  const stateReturnsMap = {};
+  magOrders.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    const state = (row['State']||'').trim();
+    if (!state || !oid) return;
+    if (!stateOrders[state]) stateOrders[state] = new Set();
+    stateOrders[state].add(oid);
+  });
+  magReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    if (!addressByOrder[oid]) return;
+    const state = addressByOrder[oid].state;
+    if (!state) return;
+    if (!stateReturnsMap[state]) stateReturnsMap[state] = new Set();
+    stateReturnsMap[state].add(oid);
+  });
+
+  const totalOrdCt = Object.values(stateOrders).reduce((s,v) => s+v.size, 0) || 1;
+  const totalRetCt = Object.values(stateReturnsMap).reduce((s,v) => s+v.size, 0) || 1;
+  const overallReturnRate = totalRetCt / totalOrdCt;
+
+  const stateReturnRates = {};
+  const allStates = new Set([...Object.keys(stateOrders), ...Object.keys(stateReturnsMap)]);
+  allStates.forEach(state => {
+    const sOrd = (stateOrders[state]||new Set()).size;
+    const sRet = (stateReturnsMap[state]||new Set()).size;
+    const sRate = sOrd > 0 ? sRet/sOrd : 0;
+    stateReturnRates[state] = {orders:sOrd, returns:sRet, rate:sRate, is_anomaly: sRate > overallReturnRate*2 && sRet >= 5};
+  });
+
+  const zipOrdersMap = {};
+  const zipReturnSet = {};
+  magOrders.forEach(row => {
+    const zc = (row['Zipcode']||'').trim();
+    const oid = (row['Order ID']||'').trim();
+    if (!zc || !oid) return;
+    if (!zipOrdersMap[zc]) zipOrdersMap[zc] = new Set();
+    zipOrdersMap[zc].add(oid);
+  });
+  magReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    if (!addressByOrder[oid]) return;
+    const zc = addressByOrder[oid].zipcode;
+    if (!zc) return;
+    if (!zipReturnSet[zc]) zipReturnSet[zc] = new Set();
+    zipReturnSet[zc].add(oid);
+  });
+
+  const zipHotspots = new Set();
+  Object.entries(zipReturnSet).forEach(([zc, retSet]) => {
+    const zOrd = (zipOrdersMap[zc]||new Set()).size;
+    const zRet = retSet.size;
+    if (zOrd > 0 && zRet/zOrd > overallReturnRate*3 && zRet >= 3) zipHotspots.add(zc);
+  });
+
+  const creatorReturnStates = {};
+  magReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    if (!creatorByOrder[oid] || !addressByOrder[oid]) return;
+    const creator = creatorByOrder[oid].creator;
+    const state = addressByOrder[oid].state;
+    if (!creator || !state) return;
+    if (!creatorReturnStates[creator]) creatorReturnStates[creator] = {};
+    creatorReturnStates[creator][state] = (creatorReturnStates[creator][state]||0) + 1;
+  });
+
+  const creatorConcentrated = {};
+  Object.entries(creatorReturnStates).forEach(([creator, states]) => {
+    const total = Object.values(states).reduce((s,v) => s+v, 0);
+    if (total < 3) return;
+    const topState = Object.entries(states).sort((a,b) => b[1]-a[1])[0];
+    const pct = topState[1]/total;
+    if (pct >= 0.70) creatorConcentrated[creator] = {state:topState[0], pct, count:topState[1]};
+  });
+
+  return {
+    creatorByOrder, addressByOrder, buyerOrders, buyerReturns, buyerReturnRecords,
+    creatorOrderCount, creatorReturnOrders, allCreators, zipReturns: zipReturnsMap,
+    addrReturns, selfBuyOrders, sockPuppetPhone, sockPuppetName,
+    stateReturnRates, overallReturnRate, zipHotspots,
+    zipOrders: Object.fromEntries(Object.entries(zipOrdersMap).map(([k,v])=>[k,v.size])),
+    zipReturnCounts: Object.fromEntries(Object.entries(zipReturnSet).map(([k,v])=>[k,v.size])),
+    creatorConcentrated,
+  };
+}
+
+// ── Score Returns ──
+function scoreReturns(magReturns, lookups) {
+  const suspiciousReasons = new Set(['Missing items','Missing package','Missing parts']);
+  const results = [];
+
+  magReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    const returnOid = (row['Return Order ID']||'').trim();
+    const buyer = (row['Buyer Username']||'').trim();
+    const reason = (row['Return Reason']||'').trim();
+    const returnType = (row['Return Type']||'').trim();
+    const refundAmount = parseDollar(row['Return unit price']);
+    const orderAmount = parseDollar(row['Order Amount']);
+    const returnStatus = (row['Return Status']||'').trim();
+    const returnSub = (row['Return Sub Status']||'').trim();
+    const product = (row['Product Name']||'').trim();
+    const buyerNote = (row['Buyer Note']||'').trim();
+    const timeRequested = parseDateDDMM(row['Time Requested']);
+    const paymentMethod = (row['Payment Method']||'').trim();
+
+    let score = 0;
+    const flags = [];
+
+    // R1: Buyer return rate
+    const bOrdCnt = (lookups.buyerOrders[buyer]||new Set()).size;
+    const bRetCnt = (lookups.buyerReturns[buyer]||new Set()).size;
+    const bRetRate = bOrdCnt > 0 ? bRetCnt/bOrdCnt : 0;
+    if (bRetRate > 0.5 && bRetCnt > 1) {
+      score += WEIGHTS.high_buyer_return_rate;
+      flags.push(`Buyer return rate ${Math.round(bRetRate*100)}% (${bRetCnt}/${bOrdCnt} orders)`);
+    }
+
+    // R2: Repeat returner
+    if (bRetCnt >= 2) {
+      score += WEIGHTS.repeat_returner;
+      flags.push(`Repeat returner: ${bRetCnt} orders returned`);
+    }
+
+    // R3: Creator return rate
+    const creatorInfo = lookups.creatorByOrder[oid] || {};
+    const creator = creatorInfo.creator || '';
+    let commissionAtRisk = 0;
+    if (creator) {
+      const cOrd = lookups.creatorOrderCount[creator] || 0;
+      const cRet = (lookups.creatorReturnOrders[creator]||new Set()).size;
+      if (cOrd > 0) {
+        const cRate = cRet/cOrd;
+        if (cRate > 0.10 && cRet >= 2) {
+          score += WEIGHTS.high_creator_return_rate;
+          flags.push(`Creator '${creator}' return rate ${Math.round(cRate*100)}% (${cRet}/${cOrd})`);
+        }
+      }
+      commissionAtRisk = creatorInfo.est_commission || creatorInfo.actual_commission || 0;
+    }
+
+    // R4: Return timing
+    const deliveryDate = parseDateDDMM(creatorInfo.delivery_time);
+    const addrInfo = lookups.addressByOrder[oid] || {};
+    const deliveryDate2 = !deliveryDate ? parseDateMMDD(addrInfo.delivered_time) : null;
+    const delivery = deliveryDate || deliveryDate2;
+    let daysSince = null;
+    if (delivery && timeRequested) {
+      daysSince = daysDiff(delivery, timeRequested);
+      if (daysSince < 0) daysSince = null;
+      else if (daysSince > COMMISSION_HOLD_DAYS) {
+        score += WEIGHTS.return_after_commission;
+        flags.push(`Return ${daysSince}d after delivery (AFTER ${COMMISSION_HOLD_DAYS}d window)`);
+      } else if (daysSince >= 25) {
+        score += WEIGHTS.return_near_commission_window;
+        flags.push(`Return ${daysSince}d after delivery (near commission window)`);
+      }
+    }
+
+    // R4b: Commission already paid
+    const commPaidDate = parseDateDDMM(creatorInfo.commission_paid_time);
+    let commPaid = false;
+    if (commPaidDate) {
+      commPaid = true;
+      if (timeRequested && timeRequested > commPaidDate) {
+        score += WEIGHTS.commission_already_paid;
+        flags.push(`COMMISSION ALREADY PAID ${daysDiff(commPaidDate, timeRequested)}d before return`);
+      } else if (!timeRequested) {
+        score += WEIGHTS.commission_already_paid;
+        flags.push('COMMISSION WAS PAID (timing unclear)');
+      }
+    }
+
+    // R5: Suspicious reason
+    if (suspiciousReasons.has(reason)) {
+      score += WEIGHTS.suspicious_reason;
+      flags.push(`Suspicious reason: '${reason}'`);
+    }
+
+    // R6: Missing items cluster
+    const zc = addrInfo.zipcode || '';
+    if (zc && lookups.zipReturns[zc]) {
+      const zipMissing = lookups.zipReturns[zc].filter(r => suspiciousReasons.has(r.reason) && r.order_id !== oid);
+      if (zipMissing.length >= 2) {
+        score += WEIGHTS.missing_items_cluster_zip;
+        flags.push(`Zip ${zc}: ${zipMissing.length+1} 'missing items' returns`);
+      }
+    }
+
+    // R7: BNPL
+    const pay = paymentMethod || addrInfo.payment_method || '';
+    if (['klarna','affirm','paylater','pay over time','pay in'].some(k => pay.toLowerCase().includes(k))) {
+      score += WEIGHTS.bnpl_payment;
+      flags.push(`BNPL payment: ${pay}`);
+    }
+
+    // R8: Duplicate return
+    const buyerRecs = lookups.buyerReturnRecords[buyer] || [];
+    const sameOrderRecs = buyerRecs.filter(r => r === oid);
+    if (sameOrderRecs.length > 1) {
+      score += WEIGHTS.duplicate_return_attempt;
+      flags.push(`Duplicate return: ${sameOrderRecs.length} requests on same order`);
+    }
+
+    // R9: Repeat address
+    const addr = (addrInfo.address||'').toUpperCase();
+    if (addr.length > 5 && lookups.addrReturns[addr]) {
+      const cnt = lookups.addrReturns[addr].size;
+      if (cnt >= 2) {
+        score += WEIGHTS.repeat_address_returns;
+        flags.push(`Address has ${cnt} return orders`);
+      }
+    }
+
+    // R10: State anomaly
+    const state = addrInfo.state || '';
+    if (state && lookups.stateReturnRates[state] && lookups.stateReturnRates[state].is_anomaly) {
+      score += WEIGHTS.state_return_anomaly;
+      const sr = lookups.stateReturnRates[state];
+      const mult = lookups.overallReturnRate > 0 ? (sr.rate/lookups.overallReturnRate).toFixed(1) : 0;
+      flags.push(`State '${state}' return rate ${Math.round(sr.rate*100)}% (${mult}x avg)`);
+    }
+
+    // R11: Zip hotspot
+    if (zc && lookups.zipHotspots.has(zc)) {
+      const zOrd = lookups.zipOrders[zc]||0;
+      const zRet = lookups.zipReturnCounts[zc]||0;
+      const zRate = zOrd > 0 ? Math.round(zRet/zOrd*100) : 0;
+      score += WEIGHTS.zip_return_hotspot;
+      flags.push(`Zip ${zc} hotspot: ${zRate}% (${zRet}/${zOrd})`);
+    }
+
+    // R12: Creator state concentration
+    if (creator && lookups.creatorConcentrated[creator]) {
+      const cc = lookups.creatorConcentrated[creator];
+      score += WEIGHTS.creator_state_concentration;
+      flags.push(`Creator '${creator}' returns: ${Math.round(cc.pct*100)}% from ${cc.state}`);
+    }
+
+    // R13: Self-buy
+    if (lookups.selfBuyOrders.has(oid)) {
+      score += WEIGHTS.creator_self_buy;
+      if (buyer.toLowerCase() === (creator||'').toLowerCase()) {
+        flags.push(`SELF-BUY: buyer @${buyer} IS the creator`);
+      } else {
+        flags.push(`SELF-BUY: buyer @${buyer} is a creator buying via @${creator}`);
+      }
+    }
+
+    // R14: Same-day return
+    if (daysSince === 0) {
+      score += WEIGHTS.same_day_return;
+      flags.push('Same-day return: filed on delivery day');
+    }
+
+    // R15: Sock puppet phone
+    if (lookups.sockPuppetPhone[buyer]) {
+      const {buyers} = lookups.sockPuppetPhone[buyer];
+      const others = [...buyers].filter(b => b !== buyer);
+      if (others.length) {
+        score += WEIGHTS.sock_puppet_phone;
+        flags.push(`SOCK PUPPET: same phone as @${others.slice(0,3).join(', @')}`);
+      }
+    }
+
+    // R16: Sock puppet name
+    if (lookups.sockPuppetName[buyer]) {
+      const {buyers, name} = lookups.sockPuppetName[buyer];
+      const others = [...buyers].filter(b => b !== buyer);
+      if (others.length) {
+        score += WEIGHTS.sock_puppet_address;
+        flags.push(`SOCK PUPPET: same recipient '${name}' as @${others.slice(0,3).join(', @')}`);
+      }
+    }
+
+    results.push({
+      risk_level: riskLabel(score),
+      fraud_score: score,
+      recommended_action: recommendedAction(score, reason, returnStatus, daysSince),
+      flags: flags.join(' | '),
+      return_order_id: returnOid,
+      order_id: oid,
+      buyer_username: buyer,
+      product: product.slice(0,80),
+      return_reason: reason,
+      return_type: returnType,
+      refund_amount: refundAmount,
+      order_amount: orderAmount,
+      commission_at_risk: commissionAtRisk,
+      commission_paid: commPaid ? 'YES' : 'NO',
+      return_status: returnStatus,
+      return_sub_status: returnSub,
+      time_requested: timeRequested ? timeRequested.toISOString().slice(0,16).replace('T',' ') : '',
+      days_since_delivery: daysSince !== null ? daysSince : '',
+      creator: creator,
+      state: state,
+      city: addrInfo.city || '',
+      zipcode: zc,
+      payment_method: pay,
+      buyer_note: buyerNote.slice(0,200),
+      buyer_unique_orders: bOrdCnt,
+      buyer_unique_returns: bRetCnt,
+      buyer_return_rate: bOrdCnt > 0 ? Math.round(bRetRate*100)+'%' : '',
+    });
+  });
+
+  return results.sort((a,b) => b.fraud_score - a.fraud_score);
+}
+
+// ── Daily Stats ──
+function computeDailyStats(magAffiliates, magReturns, lookups) {
+  const daily = {};
+  magAffiliates.forEach(row => {
+    const dt = parseDateDDMM(row['Time Created']);
+    if (!dt) return;
+    const day = dt.toISOString().slice(0,10);
+    if (!daily[day]) daily[day] = {orders:0,returns:0,refund:0,commission:0};
+    daily[day].orders++;
+  });
+  magReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    if (!lookups.creatorByOrder[oid]) return;
+    const dt = parseDateDDMM(row['Time Requested']);
+    if (!dt) return;
+    const day = dt.toISOString().slice(0,10);
+    if (!daily[day]) daily[day] = {orders:0,returns:0,refund:0,commission:0};
+    daily[day].returns++;
+    daily[day].refund += parseDollar(row['Return unit price']);
+    const ci = lookups.creatorByOrder[oid]||{};
+    daily[day].commission += ci.est_commission || ci.actual_commission || 0;
+  });
+  return Object.entries(daily).sort(([a],[b])=>a.localeCompare(b)).map(([date,d])=>({date,...d}));
+}
+
+// ── Overview ──
+function computeOverview(returns, affiliates, orders, magReturns, magAffiliates, magOrders, lookups) {
+  const creatorByOrder = {};
+  magAffiliates.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    const creator = (row['Creator Username']||'').trim();
+    if (oid && creator) creatorByOrder[oid] = creator;
+  });
+
+  const magAffReturns = magReturns.filter(r => creatorByOrder[(r['Order ID']||'').trim()]);
+
+  const ordersByDate = {};
+  magAffiliates.forEach(row => {
+    const dt = parseDateDDMM(row['Date']||row['Time Created']);
+    if (!dt) return;
+    const d = dt.toISOString().slice(0,10);
+    ordersByDate[d] = (ordersByDate[d]||0) + 1;
+  });
+
+  const returnsByDate = {};
+  const refundByDate = {};
+  magAffReturns.forEach(row => {
+    const dt = parseDateDDMM(row['Time Requested']);
+    if (!dt) return;
+    const d = dt.toISOString().slice(0,10);
+    returnsByDate[d] = (returnsByDate[d]||0) + 1;
+    refundByDate[d] = (refundByDate[d]||0) + parseDollar(row['Return unit price']);
+  });
+
+  const allDates = [...new Set([...Object.keys(ordersByDate),...Object.keys(returnsByDate)])].sort();
+  const daily = allDates.map(d => {
+    const o = ordersByDate[d]||0, r = returnsByDate[d]||0;
+    return {date:d,orders:o,refunds:r,refund_rate:o>0?((r/o*100).toFixed(1)+'%'):'0.0%',refund_amount:refundByDate[d]||0,top_state:'—',addr_concentration:'—',avg_order_per_addr:'—',max_qty_per_addr:'—'};
+  });
+
+  const totalOrders = daily.reduce((s,d)=>s+d.orders,0);
+  const totalRefunds = daily.reduce((s,d)=>s+d.refunds,0);
+  const daysWithData = daily.filter(d=>d.orders>0).length;
+  const dailyRates = daily.filter(d=>d.orders>0).map(d=>d.refunds/d.orders*100);
+  const avgDailyReturn = dailyRates.length ? (dailyRates.reduce((a,b)=>a+b,0)/dailyRates.length).toFixed(1)+'%' : '0.0%';
+
+  const allStates = {};
+  magOrders.forEach(row => {
+    const s = (row['State']||'').trim();
+    if (s) allStates[s] = (allStates[s]||0)+1;
+  });
+  const topState = Object.entries(allStates).sort((a,b)=>b[1]-a[1])[0];
+
+  const creatorOrders = {};
+  const creatorReturns = {};
+  magAffiliates.forEach(row => {
+    const c = (row['Creator Username']||'').trim();
+    if (c) creatorOrders[c] = (creatorOrders[c]||0)+1;
+  });
+  magAffReturns.forEach(row => {
+    const oid = (row['Order ID']||'').trim();
+    const c = creatorByOrder[oid]||'';
+    if (c) creatorReturns[c] = (creatorReturns[c]||0)+1;
+  });
+
+  const creators = Object.entries(creatorOrders).map(([username,o])=>{
+    const r = creatorReturns[username]||0;
+    return {username,orders:o,returns:r,return_pct:o>0?((r/o*100).toFixed(2)+'%'):'0.00%'};
+  }).sort((a,b)=>b.returns-a.returns);
+
+  const userOrd = {};
+  const userRet = {};
+  magOrders.forEach(row => {
+    const b = (row['Buyer Username']||'').trim();
+    if (b) userOrd[b] = (userOrd[b]||0)+1;
+  });
+  magAffReturns.forEach(row => {
+    const b = (row['Buyer Username']||'').trim();
+    if (b) userRet[b] = (userRet[b]||0)+1;
+  });
+  const allUsers = new Set([...Object.keys(userOrd),...Object.keys(userRet)]);
+  const users = [...allUsers].map(u => {
+    const o=userOrd[u]||0, r=userRet[u]||0;
+    return {username:u,orders:o,returns:r,return_pct:o>0?((r/o*100).toFixed(2)+'%'):'N/A'};
+  }).filter(u=>u.orders>0||u.returns>0).sort((a,b)=>b.returns-a.returns);
+
+  const uRates = users.filter(u=>u.orders>0).map(u=>u.returns/u.orders*100);
+  const cRates = creators.filter(c=>c.orders>0).map(c=>c.returns/c.orders*100);
+  const pct = (data,p) => { if(!data.length)return 0; const s=[...data].sort((a,b)=>a-b); const k=(s.length-1)*p/100; const f=Math.floor(k); return s[f]+(k-f)*(s[Math.min(f+1,s.length-1)]-s[f]); };
+  const uAvg = uRates.length ? uRates.reduce((a,b)=>a+b,0)/uRates.length : 0;
+  const cAvg = cRates.length ? cRates.reduce((a,b)=>a+b,0)/cRates.length : 0;
+
+  return {
+    daily,
+    summary:{
+      total_orders:String(totalOrders),total_refunds:String(totalRefunds),
+      total_refund_rate:totalOrders>0?((totalRefunds/totalOrders*100).toFixed(2)+'%'):'0.0%',
+      avg_daily_return_pct:avgDailyReturn,
+      avg_daily_returns:daysWithData>0?(totalRefunds/daysWithData).toFixed(1):'0',
+      top_state:topState?topState[0]:'—',
+      top_state_pct:topState&&totalOrders>0?((topState[1]/totalOrders*100).toFixed(1)+'%'):'—',
+      days_of_data:String(daily.length),
+    },
+    creators, creators_with_returns:creators.filter(c=>c.returns>0),
+    users, users_with_returns:users.filter(u=>u.returns>0),
+    user_bench:{avg_refund_pct:uAvg.toFixed(2)+'%',p99_refund_pct:pct(uRates,99).toFixed(2)+'%',above_avg:String(uRates.filter(r=>r>uAvg).length),above_p99:String(uRates.filter(r=>r>pct(uRates,99)).length)},
+    creator_bench:{avg_refund_pct:cAvg.toFixed(2)+'%',p99_refund_pct:pct(cRates,99).toFixed(2)+'%',above_avg:String(cRates.filter(r=>r>cAvg).length),above_p95:String(cRates.filter(r=>r>pct(cRates,95)).length)},
+  };
 }
 </script>
 {% endblock %}
