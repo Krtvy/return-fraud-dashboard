@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Processing — Return Fraud Dashboard{% endblock %}
+{% block content %}
+
+<div class="min-h-[60vh] flex items-center justify-center">
+  <div class="card bg-base-100 border border-base-300 shadow-sm w-full max-w-lg">
+    <div class="card-body p-8 text-center">
+
+      <!-- Spinner -->
+      <div id="spinner" class="flex justify-center mb-6">
+        <span class="loading loading-spinner loading-lg text-brand-green"></span>
+      </div>
+
+      <!-- Done icon (hidden initially) -->
+      <div id="done-icon" class="hidden justify-center mb-6">
+        <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+          <span class="text-3xl">✅</span>
+        </div>
+      </div>
+
+      <!-- Error icon (hidden initially) -->
+      <div id="error-icon" class="hidden justify-center mb-6">
+        <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+          <span class="text-3xl">❌</span>
+        </div>
+      </div>
+
+      <h2 id="status-title" class="text-xl font-bold text-brand-dark mb-2">Analysing Your CSVs...</h2>
+      <p id="status-msg" class="text-brand-sage text-sm mb-6">
+        Running 16 fraud detection rules across all returns. This takes 1–3 minutes for large files — please keep this tab open.
+      </p>
+
+      <!-- Progress steps -->
+      <div id="progress-steps" class="text-left space-y-2 mb-6">
+        <div class="flex items-center gap-3 text-sm" id="step-1">
+          <span class="loading loading-spinner loading-xs text-brand-green"></span>
+          <span class="text-brand-sage">Reading CSV files...</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm opacity-40" id="step-2">
+          <span class="w-4 h-4 rounded-full border-2 border-base-300 inline-block"></span>
+          <span class="text-brand-sage">Building buyer & creator lookups...</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm opacity-40" id="step-3">
+          <span class="w-4 h-4 rounded-full border-2 border-base-300 inline-block"></span>
+          <span class="text-brand-sage">Scoring returns against 16 fraud rules...</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm opacity-40" id="step-4">
+          <span class="w-4 h-4 rounded-full border-2 border-base-300 inline-block"></span>
+          <span class="text-brand-sage">Computing overview & daily stats...</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm opacity-40" id="step-5">
+          <span class="w-4 h-4 rounded-full border-2 border-base-300 inline-block"></span>
+          <span class="text-brand-sage">Saving results to database...</span>
+        </div>
+      </div>
+
+      <div id="elapsed" class="text-xs text-brand-sage/60 num"></div>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const jobId = "{{ job_id }}";
+const startTime = Date.now();
+let pollCount = 0;
+let stepIndex = 1;
+const stepIntervals = [8, 20, 35, 50]; // seconds to advance each step
+
+function formatElapsed(ms) {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s elapsed`;
+  return `${Math.floor(s/60)}m ${s%60}s elapsed`;
+}
+
+function advanceSteps(elapsedSec) {
+  stepIntervals.forEach((threshold, i) => {
+    const stepEl = document.getElementById(`step-${i+2}`);
+    if (elapsedSec >= threshold && stepEl) {
+      stepEl.classList.remove('opacity-40');
+      stepEl.querySelector('span').outerHTML = '<span class="loading loading-spinner loading-xs text-brand-green"></span>';
+      // Mark previous step done
+      const prevEl = document.getElementById(`step-${i+1}`);
+      if (prevEl) {
+        const spinner = prevEl.querySelector('.loading');
+        if (spinner) spinner.outerHTML = '<span class="text-green-500">✓</span>';
+      }
+    }
+  });
+}
+
+function poll() {
+  const elapsed = Date.now() - startTime;
+  const elapsedSec = elapsed / 1000;
+  
+  document.getElementById('elapsed').textContent = formatElapsed(elapsed);
+  advanceSteps(elapsedSec);
+
+  fetch(`/status/${jobId}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'done') {
+        // Mark all steps done
+        for (let i = 1; i <= 5; i++) {
+          const el = document.getElementById(`step-${i}`);
+          if (el) {
+            const spinner = el.querySelector('.loading, .rounded-full');
+            if (spinner) spinner.outerHTML = '<span class="text-green-500">✓</span>';
+            el.classList.remove('opacity-40');
+          }
+        }
+        document.getElementById('spinner').classList.add('hidden');
+        document.getElementById('done-icon').classList.remove('hidden');
+        document.getElementById('done-icon').classList.add('flex');
+        document.getElementById('status-title').textContent = 'Analysis Complete!';
+        document.getElementById('status-msg').textContent = data.message || 'Redirecting to results...';
+        document.getElementById('progress-steps').classList.add('hidden');
+        setTimeout(() => { window.location.href = `/results/${data.run_id}`; }, 1500);
+
+      } else if (data.status === 'error') {
+        document.getElementById('spinner').classList.add('hidden');
+        document.getElementById('error-icon').classList.remove('hidden');
+        document.getElementById('error-icon').classList.add('flex');
+        document.getElementById('status-title').textContent = 'Processing Failed';
+        document.getElementById('status-msg').innerHTML = `<span class="text-red-600">${data.message}</span><br><br><a href="/" class="btn btn-primary btn-sm mt-2">Try Again</a>`;
+        document.getElementById('progress-steps').classList.add('hidden');
+
+      } else {
+        // Still processing — poll again in 3 seconds
+        setTimeout(poll, 3000);
+      }
+    })
+    .catch(() => {
+      // Network error — retry
+      setTimeout(poll, 5000);
+    });
+}
+
+// Start polling after 2 seconds
+setTimeout(poll, 2000);
+</script>
+{% endblock %}

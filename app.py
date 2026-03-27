@@ -5,12 +5,55 @@ Three data levels: User, Address, Creator + Daily Stats
 """
 
 import os
+import threading
+import uuid
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
 import database as db
 import detector
+
+# ─── BACKGROUND JOB TRACKING ─────────────────────────────────────────────────
+_jobs = {}  # job_id -> {"status": "processing"|"done"|"error", "run_id": int, "message": str}
+
+def _process_upload(job_id, paths):
+    try:
+        results, stats, daily_stats, raw_returns, raw_affiliates, raw_orders = detector.run_detection(
+            paths["return_raw"],
+            paths["affiliate_raw"],
+            paths["all_orders_raw"],
+        )
+        overview_data = detector.parse_overview_data(
+            paths["return_raw"],
+            paths["affiliate_raw"],
+            paths["all_orders_raw"],
+            _returns=raw_returns,
+            _affiliates=raw_affiliates,
+            _orders=raw_orders,
+        )
+        run_id = db.save_run(stats)
+        db.save_results(run_id, results)
+        db.save_daily_stats(run_id, daily_stats)
+        db.save_overview(run_id, overview_data)
+        db.update_creator_profiles(results)
+
+        _jobs[job_id] = {
+            "status": "done",
+            "run_id": run_id,
+            "message": (
+                f"Analysis complete: {stats['mag_returns']} affiliate MagAsha returns analyzed "
+                f"({stats['critical_count']} CRITICAL, {stats['high_count']} HIGH)"
+            )
+        }
+    except Exception as e:
+        _jobs[job_id] = {"status": "error", "message": str(e)}
+    finally:
+        for path in paths.values():
+            try:
+                os.remove(path)
+            except OSError:
+                pass
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
@@ -53,6 +96,7 @@ def upload():
             flash(f"Invalid file type for {key}: must be .csv", "error")
             return redirect(url_for("index"))
 
+    # Save files to disk immediately — fast, no timeout risk
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     paths = {}
     for key, f in files.items():
@@ -61,47 +105,29 @@ def upload():
         f.save(path)
         paths[key] = path
 
-    try:
-        # Load CSVs once, pass to both functions to avoid double file reads
-        results, stats, daily_stats, raw_returns, raw_affiliates, raw_orders = detector.run_detection(
-            paths["return_raw"],
-            paths["affiliate_raw"],
-            paths["all_orders_raw"],
-        )
+    # Start background processing — return immediately so connection doesn't drop
+    job_id = str(uuid.uuid4())
+    _jobs[job_id] = {"status": "processing", "message": "Uploading files and starting analysis..."}
+    thread = threading.Thread(target=_process_upload, args=(job_id, paths), daemon=True)
+    thread.start()
 
-        # Pass pre-loaded data so files are not read again
-        overview_data = detector.parse_overview_data(
-            paths["return_raw"],
-            paths["affiliate_raw"],
-            paths["all_orders_raw"],
-            _returns=raw_returns,
-            _affiliates=raw_affiliates,
-            _orders=raw_orders,
-        )
+    return redirect(url_for("processing", job_id=job_id))
 
-        run_id = db.save_run(stats)
-        db.save_results(run_id, results)
-        db.save_daily_stats(run_id, daily_stats)
-        db.save_overview(run_id, overview_data)
-        db.update_creator_profiles(results)
 
-        flash(
-            f"Analysis complete: {stats['mag_returns']} affiliate MagAsha returns analyzed "
-            f"(filtered from {stats['mag_returns_all']} total), "
-            f"{stats['critical_count']} CRITICAL, {stats['high_count']} HIGH",
-            "success"
-        )
-        return redirect(url_for("results", run_id=run_id))
-
-    except Exception as e:
-        flash(f"Error processing files: {str(e)}", "error")
+@app.route("/processing/<job_id>")
+def processing(job_id):
+    if job_id not in _jobs:
+        flash("Job not found", "error")
         return redirect(url_for("index"))
-    finally:
-        for path in paths.values():
-            try:
-                os.remove(path)
-            except OSError:
-                pass
+    return render_template("processing.html", job_id=job_id)
+
+
+@app.route("/status/<job_id>")
+def job_status(job_id):
+    job = _jobs.get(job_id)
+    if not job:
+        return jsonify({"status": "error", "message": "Job not found"})
+    return jsonify(job)
 
 
 @app.route("/results/<int:run_id>")
