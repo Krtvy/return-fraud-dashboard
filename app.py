@@ -1,133 +1,48 @@
 """
 Return Fraud Dashboard — Flask Web Application
-Upload CSVs → Detect fraud → Review & take action → Track history
-Three data levels: User, Address, Creator + Daily Stats
+Detection runs in the browser (JS). Server only saves results and serves pages.
 """
 
 import os
-import threading
-import uuid
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
-from werkzeug.utils import secure_filename
 from datetime import datetime
 
 import database as db
-import detector
-
-# ─── BACKGROUND JOB TRACKING ─────────────────────────────────────────────────
-_jobs = {}  # job_id -> {"status": "processing"|"done"|"error", "run_id": int, "message": str}
-
-def _process_upload(job_id, paths):
-    try:
-        results, stats, daily_stats, raw_returns, raw_affiliates, raw_orders = detector.run_detection(
-            paths["return_raw"],
-            paths["affiliate_raw"],
-            paths["all_orders_raw"],
-        )
-        overview_data = detector.parse_overview_data(
-            paths["return_raw"],
-            paths["affiliate_raw"],
-            paths["all_orders_raw"],
-            _returns=raw_returns,
-            _affiliates=raw_affiliates,
-            _orders=raw_orders,
-        )
-        run_id = db.save_run(stats)
-        db.save_results(run_id, results)
-        db.save_daily_stats(run_id, daily_stats)
-        db.save_overview(run_id, overview_data)
-        db.update_creator_profiles(results)
-
-        _jobs[job_id] = {
-            "status": "done",
-            "run_id": run_id,
-            "message": (
-                f"Analysis complete: {stats['mag_returns']} affiliate MagAsha returns analyzed "
-                f"({stats['critical_count']} CRITICAL, {stats['high_count']} HIGH)"
-            )
-        }
-    except Exception as e:
-        _jobs[job_id] = {"status": "error", "message": str(e)}
-    finally:
-        for path in paths.values():
-            try:
-                os.remove(path)
-            except OSError:
-                pass
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
-
-UPLOAD_DIR = os.environ.get(
-    "UPLOAD_DIR",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
-)
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-ALLOWED_EXTENSIONS = {"csv"}
-
-
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
 
 # ─── ROUTES ───────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
-    runs = db.get_runs()
     dash = db.get_dashboard_stats()
-    return render_template("upload.html", runs=runs, dash=dash)
+    return render_template("upload.html", dash=dash)
 
 
-@app.route("/upload", methods=["POST"])
-def upload():
-    files = {
-        "return_raw": request.files.get("return_raw"),
-        "affiliate_raw": request.files.get("affiliate_raw"),
-        "all_orders_raw": request.files.get("all_orders_raw"),
-    }
+@app.route("/save-results", methods=["POST"])
+def save_results():
+    """Receive pre-computed results from the browser JS detector and save to DB."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data"}), 400
 
-    for key, f in files.items():
-        if not f or f.filename == "":
-            flash(f"Missing file: {key.replace('_', ' ').title()}", "error")
-            return redirect(url_for("index"))
-        if not allowed_file(f.filename):
-            flash(f"Invalid file type for {key}: must be .csv", "error")
-            return redirect(url_for("index"))
+    try:
+        results = data["results"]
+        stats = data["stats"]
+        daily_stats = data["dailyStats"]
+        overview = data["overview"]
 
-    # Save files to disk immediately — fast, no timeout risk
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    paths = {}
-    for key, f in files.items():
-        filename = f"{timestamp}_{secure_filename(f.filename)}"
-        path = os.path.join(UPLOAD_DIR, filename)
-        f.save(path)
-        paths[key] = path
+        run_id = db.save_run(stats)
+        db.save_results(run_id, results)
+        db.save_daily_stats(run_id, daily_stats)
+        db.save_overview(run_id, overview)
+        db.update_creator_profiles(results)
 
-    # Start background processing — return immediately so connection doesn't drop
-    job_id = str(uuid.uuid4())
-    _jobs[job_id] = {"status": "processing", "message": "Uploading files and starting analysis..."}
-    thread = threading.Thread(target=_process_upload, args=(job_id, paths), daemon=True)
-    thread.start()
+        return jsonify({"run_id": run_id, "status": "ok"})
 
-    return redirect(url_for("processing", job_id=job_id))
-
-
-@app.route("/processing/<job_id>")
-def processing(job_id):
-    if job_id not in _jobs:
-        flash("Job not found", "error")
-        return redirect(url_for("index"))
-    return render_template("processing.html", job_id=job_id)
-
-
-@app.route("/status/<job_id>")
-def job_status(job_id):
-    job = _jobs.get(job_id)
-    if not job:
-        return jsonify({"status": "error", "message": "Job not found"})
-    return jsonify(job)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/results/<int:run_id>")
@@ -136,17 +51,21 @@ def results(run_id):
     if not run:
         flash("Run not found", "error")
         return redirect(url_for("index"))
-
     risk_filter = request.args.get("risk", "ALL")
     action_filter = request.args.get("action", "ALL")
     rows = db.get_results(run_id, risk_filter=risk_filter, action_filter=action_filter)
     summary = db.get_results_summary(run_id)
+    return render_template("results.html", run=run, rows=rows,
+                           risk_filter=risk_filter, action_filter=action_filter, summary=summary)
 
-    return render_template("results.html",
-                           run=run, rows=rows,
-                           risk_filter=risk_filter,
-                           action_filter=action_filter,
-                           summary=summary)
+
+@app.route("/return/<int:flagged_id>")
+def return_detail(flagged_id):
+    detail = db.get_return_detail(flagged_id)
+    if not detail:
+        flash("Return not found", "error")
+        return redirect(url_for("index"))
+    return render_template("return_detail.html", **detail)
 
 
 @app.route("/users/<int:run_id>")
@@ -195,22 +114,11 @@ def overview(run_id):
     if not run:
         flash("Run not found", "error")
         return redirect(url_for("index"))
-
     data = db.get_overview(run_id)
     if not data:
         flash("No overview data for this run. Re-upload CSVs to generate it.", "error")
         return redirect(url_for("results", run_id=run_id))
-
     return render_template("overview.html", run=run, data=data)
-
-
-@app.route("/return/<int:flagged_id>")
-def return_detail(flagged_id):
-    detail = db.get_return_detail(flagged_id)
-    if not detail:
-        flash("Return not found", "error")
-        return redirect(url_for("index"))
-    return render_template("return_detail.html", **detail)
 
 
 @app.route("/action", methods=["POST"])
@@ -218,14 +126,11 @@ def take_action():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data"}), 400
-
     flagged_id = data.get("id")
     action = data.get("action")
     notes = data.get("notes", "")
-
     if not flagged_id or not action:
         return jsonify({"error": "Missing id or action"}), 400
-
     db.update_action(flagged_id, action, notes)
     return jsonify({"status": "ok", "action": action})
 
@@ -245,23 +150,17 @@ def creators():
 # ─── TEMPLATE FILTERS ────────────────────────────────────────────────────────
 @app.template_filter("currency")
 def currency_filter(value):
-    try:
-        return f"${float(value):,.2f}"
-    except (ValueError, TypeError):
-        return "$0.00"
-
+    try: return f"${float(value):,.2f}"
+    except: return "$0.00"
 
 @app.template_filter("pct")
 def pct_filter(value):
-    try:
-        return f"{float(value):.1%}"
-    except (ValueError, TypeError):
-        return "0.0%"
+    try: return f"{float(value):.1%}"
+    except: return "0.0%"
 
 
 # ─── INIT ────────────────────────────────────────────────────────────────────
 db.init_db()
 
 if __name__ == "__main__":
-    print("\n  Return Fraud Dashboard running at http://127.0.0.1:8080\n")
     app.run(debug=True, port=8080, host="0.0.0.0")

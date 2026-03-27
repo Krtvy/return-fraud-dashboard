@@ -1,5 +1,7 @@
-{% extends "base.html" %} {% block title %}Upload — Return Fraud Dashboard{%
-endblock %} {% block content %}
+{% extends "base.html" %}
+{% block title %}Upload — Return Fraud Dashboard{% endblock %}
+{% block content %}
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
   <!-- Upload Card -->
   <div class="lg:col-span-2">
@@ -10,101 +12,58 @@ endblock %} {% block content %}
           <div class="pulse-dot"></div>
         </div>
         <p class="text-brand-sage text-sm mb-6">
-          Upload your 3 TikTok raw CSV exports to detect fraudulent MagAsha
-          returns.
+          Upload your 3 TikTok raw CSV exports. Files are processed <strong>entirely in your browser</strong> — nothing is uploaded to a server.
         </p>
 
-        <form
-          action="/upload"
-          method="POST"
-          enctype="multipart/form-data"
-          id="uploadForm"
-        >
-          <div class="space-y-4">
-            <!-- Return Raw -->
-            <div
-              class="border border-dashed border-base-300 rounded-xl p-5 hover:border-brand-green/30 hover:bg-brand-green/[0.02] transition-all"
-            >
-              <label class="block text-sm font-semibold text-brand-dark mb-2">
-                <span class="text-brand-green num mr-2">01</span>Return Raw CSV
-                <span class="text-brand-sage font-normal ml-2"
-                  >Seller Center &rarr; Returns</span
-                >
-              </label>
-              <input
-                type="file"
-                name="return_raw"
-                accept=".csv"
-                required
-                class="file-input file-input-bordered file-input-sm w-full"
-              />
-            </div>
-
-            <!-- Affiliate Raw -->
-            <div
-              class="border border-dashed border-base-300 rounded-xl p-5 hover:border-brand-green/30 hover:bg-brand-green/[0.02] transition-all"
-            >
-              <label class="block text-sm font-semibold text-brand-dark mb-2">
-                <span class="text-brand-green num mr-2">02</span>Affiliate Raw
-                CSV
-                <span class="text-brand-sage font-normal ml-2"
-                  >Affiliate Center &rarr; Orders</span
-                >
-              </label>
-              <input
-                type="file"
-                name="affiliate_raw"
-                accept=".csv"
-                required
-                class="file-input file-input-bordered file-input-sm w-full"
-              />
-            </div>
-
-            <!-- All Orders Raw -->
-            <div
-              class="border border-dashed border-base-300 rounded-xl p-5 hover:border-brand-green/30 hover:bg-brand-green/[0.02] transition-all"
-            >
-              <label class="block text-sm font-semibold text-brand-dark mb-2">
-                <span class="text-brand-green num mr-2">03</span>All Orders Raw
-                CSV
-                <span class="text-brand-sage font-normal ml-2"
-                  >Seller Center &rarr; All Orders</span
-                >
-              </label>
-              <input
-                type="file"
-                name="all_orders_raw"
-                accept=".csv"
-                required
-                class="file-input file-input-bordered file-input-sm w-full"
-              />
-            </div>
+        <div class="space-y-4" id="fileZones">
+          <!-- Return Raw -->
+          <div class="border border-dashed border-base-300 rounded-xl p-5 hover:border-brand-green/30 transition-all">
+            <label class="block text-sm font-semibold text-brand-dark mb-2">
+              <span class="text-brand-green num mr-2">01</span>Return Raw CSV
+              <span class="text-brand-sage font-normal ml-2">Seller Center → Returns</span>
+            </label>
+            <input type="file" id="file-return" accept=".csv" class="file-input file-input-bordered file-input-sm w-full" />
           </div>
 
-          <button
-            type="submit"
-            id="submitBtn"
-            class="btn btn-primary w-full mt-6 text-sm"
-          >
-            Run Fraud Analysis
-          </button>
-        </form>
+          <!-- Affiliate Raw -->
+          <div class="border border-dashed border-base-300 rounded-xl p-5 hover:border-brand-green/30 transition-all">
+            <label class="block text-sm font-semibold text-brand-dark mb-2">
+              <span class="text-brand-green num mr-2">02</span>Affiliate Raw CSV
+              <span class="text-brand-sage font-normal ml-2">Affiliate Center → Orders</span>
+            </label>
+            <input type="file" id="file-affiliate" accept=".csv" class="file-input file-input-bordered file-input-sm w-full" />
+          </div>
 
-        <!-- Loading overlay -->
-        <div id="loadingOverlay" class="hidden mt-6">
+          <!-- All Orders Raw -->
+          <div class="border border-dashed border-base-300 rounded-xl p-5 hover:border-brand-green/30 transition-all">
+            <label class="block text-sm font-semibold text-brand-dark mb-2">
+              <span class="text-brand-green num mr-2">03</span>All Orders Raw CSV
+              <span class="text-brand-sage font-normal ml-2">Seller Center → All Orders</span>
+            </label>
+            <input type="file" id="file-orders" accept=".csv" class="file-input file-input-bordered file-input-sm w-full" />
+          </div>
+        </div>
+
+        <button id="runBtn" onclick="startAnalysis()" class="btn btn-primary w-full mt-6 text-sm" disabled>
+          Run Fraud Analysis
+        </button>
+
+        <!-- Progress -->
+        <div id="progressBox" class="hidden mt-6">
           <div class="alert bg-brand-green/5 border border-brand-green/10">
-            <span
-              class="loading loading-spinner loading-md text-brand-green"
-            ></span>
-            <div>
-              <p class="text-brand-dark font-medium text-sm">
-                Processing CSVs... Analyzing 16 fraud rules...
-              </p>
-              <p class="text-brand-sage text-xs">
-                This may take 15-30 seconds for large files
-              </p>
+            <span class="loading loading-spinner loading-md text-brand-green"></span>
+            <div class="w-full">
+              <p id="progressMsg" class="text-brand-dark font-medium text-sm">Starting...</p>
+              <div class="w-full bg-base-300 rounded-full h-1.5 mt-2">
+                <div id="progressBar" class="bg-brand-green h-1.5 rounded-full transition-all" style="width:0%"></div>
+              </div>
             </div>
           </div>
+        </div>
+
+        <!-- Error -->
+        <div id="errorBox" class="hidden mt-4 alert alert-error text-sm">
+          <span id="errorMsg"></span>
         </div>
       </div>
     </div>
@@ -118,57 +77,23 @@ endblock %} {% block content %}
         <p class="section-label mb-4">Latest Run</p>
         {% set last = dash.recent_runs[0] %}
         <div class="space-y-3">
-          <div class="flex justify-between text-sm">
-            <span class="text-brand-sage">Date</span>
-            <span class="text-brand-dark num text-xs"
-              >{{ last.run_date[:16] }}</span
-            >
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-brand-sage">MagAsha Returns</span>
-            <span class="text-brand-dark font-semibold num"
-              >{{ last.mag_returns }}</span
-            >
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-brand-sage">Critical</span>
-            <span class="badge badge-error badge-sm num"
-              >{{ last.critical_count }}</span
-            >
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-brand-sage">High</span>
-            <span class="badge badge-warning badge-sm num"
-              >{{ last.high_count }}</span
-            >
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-brand-sage">At-Risk $</span>
-            <span class="text-red-600 font-bold num"
-              >${{ "%.2f"|format(last.at_risk_refund) }}</span
-            >
-          </div>
-          <a
-            href="/results/{{ last.id }}"
-            class="btn btn-primary btn-sm w-full mt-3"
-          >
-            View Results &rarr;
-          </a>
+          <div class="flex justify-between text-sm"><span class="text-brand-sage">Date</span><span class="text-brand-dark num text-xs">{{ last.run_date[:16] }}</span></div>
+          <div class="flex justify-between text-sm"><span class="text-brand-sage">MagAsha Returns</span><span class="text-brand-dark font-semibold num">{{ last.mag_returns }}</span></div>
+          <div class="flex justify-between text-sm"><span class="text-brand-sage">Critical</span><span class="badge badge-error badge-sm num">{{ last.critical_count }}</span></div>
+          <div class="flex justify-between text-sm"><span class="text-brand-sage">High</span><span class="badge badge-warning badge-sm num">{{ last.high_count }}</span></div>
+          <div class="flex justify-between text-sm"><span class="text-brand-sage">At-Risk $</span><span class="text-red-600 font-bold num">${{ "%.2f"|format(last.at_risk_refund) }}</span></div>
+          <a href="/results/{{ last.id }}" class="btn btn-primary btn-sm w-full mt-3">View Results &rarr;</a>
         </div>
       </div>
     </div>
-    {% endif %} {% if dash and dash.pending_critical_high > 0 %}
-    <div
-      class="card bg-base-100 shadow-sm border border-base-300 stat-bar danger"
-    >
+    {% endif %}
+
+    {% if dash and dash.pending_critical_high > 0 %}
+    <div class="card bg-base-100 shadow-sm border border-base-300 stat-bar danger">
       <div class="card-body p-5">
         <p class="section-label mb-2">Pending Review</p>
-        <p class="text-3xl font-bold text-red-600 num">
-          {{ dash.pending_critical_high }}
-        </p>
-        <p class="text-xs text-brand-sage mt-1">
-          CRITICAL + HIGH awaiting decision
-        </p>
+        <p class="text-3xl font-bold text-red-600 num">{{ dash.pending_critical_high }}</p>
+        <p class="text-xs text-brand-sage mt-1">CRITICAL + HIGH awaiting decision</p>
       </div>
     </div>
     {% endif %}
@@ -177,94 +102,101 @@ endblock %} {% block content %}
       <div class="card-body p-5">
         <p class="section-label mb-4">Detection Rules</p>
         <div class="space-y-2.5 text-xs">
-          <div class="flex justify-between">
-            <span class="text-brand-sage">Self-Buy Detection</span>
-            <span class="num text-brand-green">+40</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-brand-sage">Commission Already Paid</span>
-            <span class="num text-brand-green">+25</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-brand-sage">Sock Puppet (Phone)</span>
-            <span class="num text-brand-green">+30</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-brand-sage">Sock Puppet (Name)</span>
-            <span class="num text-brand-green">+20</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-brand-sage">Buyer Return Rate >50%</span>
-            <span class="num text-brand-green">+25</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-brand-sage">Repeat Returner</span>
-            <span class="num text-brand-green">+20</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-brand-sage">Creator Return Rate >10%</span>
-            <span class="num text-brand-green">+20</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-brand-sage">Return After 14d Window</span>
-            <span class="num text-brand-green">+30</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-brand-sage">Duplicate Return</span>
-            <span class="num text-brand-green">+25</span>
-          </div>
+          <div class="flex justify-between"><span class="text-brand-sage">Self-Buy Detection</span><span class="num text-brand-green">+40</span></div>
+          <div class="flex justify-between"><span class="text-brand-sage">Commission Already Paid</span><span class="num text-brand-green">+25</span></div>
+          <div class="flex justify-between"><span class="text-brand-sage">Sock Puppet (Phone)</span><span class="num text-brand-green">+30</span></div>
+          <div class="flex justify-between"><span class="text-brand-sage">Sock Puppet (Name)</span><span class="num text-brand-green">+20</span></div>
+          <div class="flex justify-between"><span class="text-brand-sage">Buyer Return Rate >50%</span><span class="num text-brand-green">+25</span></div>
+          <div class="flex justify-between"><span class="text-brand-sage">Repeat Returner</span><span class="num text-brand-green">+20</span></div>
+          <div class="flex justify-between"><span class="text-brand-sage">Creator Return Rate >10%</span><span class="num text-brand-green">+20</span></div>
+          <div class="flex justify-between"><span class="text-brand-sage">Return After 30d Window</span><span class="num text-brand-green">+30</span></div>
+          <div class="flex justify-between"><span class="text-brand-sage">Duplicate Return</span><span class="num text-brand-green">+25</span></div>
           <div class="divider my-1"></div>
-          <div class="flex justify-between">
-            <span class="text-brand-sage/60">+ 7 more rules</span>
-            <span class="num text-brand-sage/60">...</span>
-          </div>
+          <div class="flex justify-between"><span class="text-brand-sage/60">+ 7 more rules</span><span class="num text-brand-sage/60">...</span></div>
         </div>
       </div>
     </div>
   </div>
 </div>
-{% endblock %} {% block scripts %}
+
+{% endblock %}
+{% block scripts %}
+<script src="/static/detector.js"></script>
 <script>
-  document.getElementById("uploadForm").addEventListener("submit", async function (e) {
-    e.preventDefault();
+// Enable run button when all 3 files selected
+['file-return','file-affiliate','file-orders'].forEach(id => {
+  document.getElementById(id).addEventListener('change', checkReady);
+});
+function checkReady() {
+  const ready = ['file-return','file-affiliate','file-orders'].every(id => document.getElementById(id).files.length > 0);
+  document.getElementById('runBtn').disabled = !ready;
+}
 
-    const btn = document.getElementById("submitBtn");
-    const overlay = document.getElementById("loadingOverlay");
+function setProgress(msg, pct) {
+  document.getElementById('progressMsg').textContent = msg;
+  document.getElementById('progressBar').style.width = pct + '%';
+}
 
-    btn.disabled = true;
-    btn.textContent = "Uploading files...";
-    btn.classList.add("btn-disabled");
-    overlay.classList.remove("hidden");
-
-    const formData = new FormData(this);
-
-    try {
-      // POST the files — server saves them instantly and returns job redirect
-      const response = await fetch("/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      // Server redirects to /processing/<job_id>
-      if (response.redirected) {
-        window.location.href = response.url;
-      } else if (response.ok) {
-        window.location.href = response.url;
-      } else {
-        const text = await response.text();
-        btn.disabled = false;
-        btn.textContent = "Run Fraud Analysis";
-        btn.classList.remove("btn-disabled");
-        overlay.classList.add("hidden");
-        alert("Upload failed. Please try again.");
-      }
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = "Run Fraud Analysis";
-      btn.classList.remove("btn-disabled");
-      overlay.classList.add("hidden");
-      alert("Network error: " + err.message);
-    }
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Failed to read ' + file.name));
+    reader.readAsText(file, 'utf-8');
   });
+}
+
+async function startAnalysis() {
+  const btn = document.getElementById('runBtn');
+  const progressBox = document.getElementById('progressBox');
+  const errorBox = document.getElementById('errorBox');
+  
+  btn.disabled = true;
+  errorBox.classList.add('hidden');
+  progressBox.classList.remove('hidden');
+
+  try {
+    setProgress('Reading Return CSV...', 10);
+    const returnText = await readFile(document.getElementById('file-return').files[0]);
+    
+    setProgress('Reading Affiliate CSV...', 25);
+    const affiliateText = await readFile(document.getElementById('file-affiliate').files[0]);
+    
+    setProgress('Reading Orders CSV...', 40);
+    const ordersText = await readFile(document.getElementById('file-orders').files[0]);
+
+    setProgress('Running fraud detection rules...', 55);
+    // Small delay to let UI update
+    await new Promise(r => setTimeout(r, 50));
+    
+    const { results, stats, dailyStats, overview } = runDetection(returnText, affiliateText, ordersText);
+    
+    setProgress(`Found ${stats.critical_count} CRITICAL, ${stats.high_count} HIGH. Saving to database...`, 80);
+    await new Promise(r => setTimeout(r, 50));
+
+    // Send only results (small JSON) to server to save
+    const response = await fetch('/save-results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ results, stats, dailyStats, overview }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error('Server error: ' + err);
+    }
+
+    const data = await response.json();
+    setProgress('Done! Redirecting to results...', 100);
+    await new Promise(r => setTimeout(r, 500));
+    window.location.href = '/results/' + data.run_id;
+
+  } catch (err) {
+    progressBox.classList.add('hidden');
+    errorBox.classList.remove('hidden');
+    document.getElementById('errorMsg').textContent = 'Error: ' + err.message;
+    btn.disabled = false;
+  }
+}
 </script>
 {% endblock %}
