@@ -1,11 +1,12 @@
-{% extends "base.html" %} {% block title %}Creator Level — Run #{{ run.id }}{%
-endblock %} {% block content %}
+{% extends "base.html" %}
+{% block title %}Creator Level — Run #{{ run.id }}{% endblock %}
+{% block content %}
+
 <div class="flex items-center justify-between mb-4">
   <div>
-    <h1 class="text-2xl font-bold text-brand-dark">Creator Level Data</h1>
+    <h1 class="text-2xl font-bold text-brand-dark">Creator Level Analysis</h1>
     <p class="text-brand-sage text-sm">
-      Run #{{ run.id }} — {{ run.run_date[:16] }} — Aggregated by affiliate
-      creator
+      Run #{{ run.id }} — {{ run.run_date[:16] }} — How each affiliate creator's audience is returning
     </p>
   </div>
   <a href="/" class="btn btn-primary btn-sm">New Analysis</a>
@@ -16,79 +17,245 @@ endblock %} {% block content %}
   <a href="/results/{{ run.id }}" role="tab" class="tab">All Returns</a>
   <a href="/users/{{ run.id }}" role="tab" class="tab">User Level</a>
   <a href="/addresses/{{ run.id }}" role="tab" class="tab">Address Level</a>
-  <a href="/creator-data/{{ run.id }}" role="tab" class="tab tab-active"
-    >Creator Level</a
-  >
+  <a href="/creator-data/{{ run.id }}" role="tab" class="tab tab-active">Creator Level</a>
   <a href="/stats/{{ run.id }}" role="tab" class="tab">Daily Stats</a>
 </div>
 
-<p class="text-sm text-brand-sage mb-4">
-  <span class="num">{{ rows|length }}</span> creators with MagAsha affiliate
-  returns
-</p>
+{% if rows %}
+{% set cohort_avg = rows[0].cohort_avg %}
+{% set flagged_creators = rows | selectattr("cohort_flagged") | list %}
 
+<!-- ── What does this page mean? (non-technical explainer) ── -->
+<div class="card bg-brand-green/5 border border-brand-green/20 mb-6">
+  <div class="card-body p-4">
+    <p class="text-sm text-brand-dark">
+      <span class="font-bold">What you're looking at:</span>
+      Each row is one TikTok affiliate creator. We look at how many orders came through their link vs how many of those orders were returned.
+      If a creator's return rate is <strong>more than 2x the average</strong> of all creators, they are flagged — it means their audience
+      is returning at an unusually high rate compared to everyone else. This could mean fake orders, misleading content, or coordinated fraud.
+      The <strong>30-day return window</strong> is used — returns filed after 30 days from delivery are automatically suspicious.
+    </p>
+  </div>
+</div>
+
+<!-- ── Cohort Summary ── -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+  <div class="card bg-base-100 border border-base-300 p-4">
+    <p class="text-xs text-brand-sage uppercase tracking-wide mb-1">Cohort Avg Return Rate</p>
+    <p class="text-3xl font-bold num text-brand-dark">{{ cohort_avg }}%</p>
+    <p class="text-xs text-brand-sage mt-1">This is the "normal" baseline across all {{ rows|length }} creators. Everyone is compared to this.</p>
+  </div>
+  <div class="card bg-base-100 border border-orange-200 p-4">
+    <p class="text-xs text-brand-sage uppercase tracking-wide mb-1">Flag Threshold (2x Avg)</p>
+    <p class="text-3xl font-bold num text-orange-500">{{ (cohort_avg * 2) | round(1) }}%</p>
+    <p class="text-xs text-brand-sage mt-1">Any creator above this return rate is flagged as anomalous.</p>
+  </div>
+  <div class="card bg-base-100 border {% if flagged_creators %}border-red-300 bg-red-50/30{% else %}border-base-300{% endif %} p-4">
+    <p class="text-xs text-brand-sage uppercase tracking-wide mb-1">Flagged Creators</p>
+    <p class="text-3xl font-bold num {% if flagged_creators %}text-red-600{% else %}text-brand-green{% endif %}">{{ flagged_creators|length }}</p>
+    <p class="text-xs text-brand-sage mt-1">Creators above 2x average with 2+ returns. Needs investigation.</p>
+  </div>
+  <div class="card bg-base-100 border border-base-300 p-4">
+    <p class="text-xs text-brand-sage uppercase tracking-wide mb-1">Total Creators Tracked</p>
+    <p class="text-3xl font-bold num text-brand-dark">{{ rows|length }}</p>
+    <p class="text-xs text-brand-sage mt-1">Creators who had at least one MagAsha return this run.</p>
+  </div>
+</div>
+
+<!-- ── FLAGGED CREATORS ALERT ── -->
+{% if flagged_creators %}
+<div class="card border-2 border-red-400 shadow-md mb-6">
+  <div class="card-body p-5 bg-red-50">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="text-2xl">🚨</span>
+      <div>
+        <h2 class="font-bold text-red-700 text-lg">{{ flagged_creators|length }} Creator{% if flagged_creators|length > 1 %}s{% endif %} Flagged — Return Rate Above 2x Cohort Average</h2>
+        <p class="text-sm text-red-600">
+          Normal for this cohort is <strong>{{ cohort_avg }}%</strong>. These creators are above <strong>{{ (cohort_avg * 2)|round(1) }}%</strong>.
+          This is statistically abnormal and warrants direct investigation — check if their content is misleading, or if the same buyers keep returning.
+        </p>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto mt-3">
+      <table class="table table-sm bg-white rounded-xl">
+        <thead>
+          <tr class="bg-red-100">
+            <th>Creator</th>
+            <th class="text-center">Their Orders</th>
+            <th class="text-center">Their Returns</th>
+            <th class="text-center">Their Return Rate</th>
+            <th class="text-center">How Many Times Above Normal</th>
+            <th class="text-right">Total Refund $</th>
+            <th class="text-right">Commission at Risk $</th>
+            <th>Other Red Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in flagged_creators %}
+          <tr class="border-b border-red-100">
+            <td class="font-bold text-red-700 text-base">@{{ r.creator }}</td>
+            <td class="text-center num font-medium">{{ r.total_orders if r.total_orders else "—" }}</td>
+            <td class="text-center num font-bold text-red-600">{{ r.unique_orders }}</td>
+            <td class="text-center">
+              <span class="badge badge-error badge-md num font-bold">{{ r.return_rate }}%</span>
+            </td>
+            <td class="text-center">
+              <span class="text-2xl font-black num text-red-600">{{ r.above_avg_multiple }}x</span>
+              <span class="block text-xs text-red-400">vs {{ cohort_avg }}% avg</span>
+            </td>
+            <td class="text-right num font-bold text-red-600 text-base">${{ "%.2f"|format(r.total_refund) }}</td>
+            <td class="text-right num font-bold text-orange-600 text-base">${{ "%.2f"|format(r.total_commission) }}</td>
+            <td>
+              {% if r.has_self_buy %}<span class="flag-tag flag-red block mb-1">🕵️ Self-Buy Detected</span>{% endif %}
+              {% if r.return_count > r.unique_orders %}<span class="flag-tag flag-orange block mb-1">📋 Duplicate Returns</span>{% endif %}
+              {% if r.commission_paid == 'YES' %}<span class="flag-tag flag-orange block mb-1">💸 Commission Already Paid</span>{% endif %}
+              {% if not r.has_self_buy and r.return_count <= r.unique_orders and r.commission_paid != 'YES' %}
+              <span class="text-brand-sage text-xs">None beyond rate</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-4 p-3 bg-white rounded-xl border border-red-200">
+      <p class="text-xs font-semibold text-red-700 mb-1">What to do with these creators:</p>
+      <p class="text-xs text-brand-sage">
+        1. Pull their TikTok videos and check if they are promising refunds, exaggerating product claims, or targeting return-prone audiences.<br>
+        2. Cross-check the buyer list — are the same users appearing under multiple creators?<br>
+        3. Consider pausing their commission payments until the return rate normalises.<br>
+        4. If self-buy is detected, remove them from the affiliate program immediately.
+      </p>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="alert alert-success mb-6 text-sm">
+  <span class="text-lg">✅</span>
+  <div>
+    <p class="font-bold">No creators flagged this run.</p>
+    <p class="text-xs opacity-80">All creators are within 2x the cohort average return rate of {{ cohort_avg }}%. Cohort looks healthy.</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Full Creator Table ── -->
 <div class="card bg-base-100 shadow-sm border border-base-300 overflow-hidden">
+  <div class="p-4 border-b border-base-300 flex items-center justify-between">
+    <div>
+      <h3 class="font-bold text-brand-dark">All Creators — Full Breakdown</h3>
+      <p class="text-xs text-brand-sage mt-0.5">Sorted by flagged first, then highest return rate. Green = below average. Orange = above average but under threshold. Red = flagged.</p>
+    </div>
+    <span class="text-xs text-brand-sage bg-base-200 px-3 py-1 rounded-full">
+      Cohort avg: <span class="num font-bold">{{ cohort_avg }}%</span>
+      &nbsp;·&nbsp; Flag threshold: <span class="num font-bold text-orange-500">{{ (cohort_avg * 2)|round(1) }}%</span>
+    </span>
+  </div>
   <div class="overflow-x-auto">
     <table class="table table-sm min-w-full">
       <thead>
         <tr>
-          <th class="text-left">Creator</th>
-          <th class="text-center">Unique Buyers</th>
-          <th class="text-center">Return Orders</th>
-          <th class="text-right">Refund $</th>
-          <th class="text-right">Commission at Risk</th>
-          <th class="text-center">Max Score</th>
-          <th class="text-center">Avg Score</th>
-          <th class="text-left">Alerts</th>
-          <th class="text-left">Commission Paid?</th>
-          <th class="text-left">Buyers</th>
-          <th class="text-left">States</th>
-          <th class="text-left">Reasons</th>
+          <th>Creator</th>
+          <th class="text-center">Total Orders via Their Link</th>
+          <th class="text-center">Orders Returned</th>
+          <th class="text-center">Return Rate</th>
+          <th class="text-center">vs Cohort Avg</th>
+          <th class="text-center">Unique Buyers Who Returned</th>
+          <th class="text-right">Total Refund $</th>
+          <th class="text-right">Commission at Risk $</th>
+          <th class="text-center">Highest Fraud Score</th>
+          <th class="text-center">Avg Fraud Score</th>
+          <th>Flags</th>
+          <th>Commission Paid Out?</th>
+          <th>Buyers Who Returned</th>
+          <th>States</th>
+          <th>Return Reasons</th>
         </tr>
       </thead>
       <tbody>
         {% for r in rows %}
-        <tr
-          class="{% if r.has_self_buy %}risk-critical {% elif r.max_score >= 60 %}risk-critical {% elif r.max_score >= 40 %}risk-high{% endif %}"
-        >
-          <td class="font-medium text-brand-dark">@{{ r.creator }}</td>
+        <tr class="{% if r.cohort_flagged %}bg-red-50/50 border-l-4 border-l-red-500{% elif r.has_self_buy %}risk-critical{% elif r.max_score >= 60 %}risk-critical{% elif r.max_score >= 40 %}risk-high{% endif %}">
+
+          <td class="font-medium {% if r.cohort_flagged %}text-red-700 font-bold{% else %}text-brand-dark{% endif %}">
+            @{{ r.creator }}
+            {% if r.cohort_flagged %}
+            <span class="badge badge-error badge-xs block mt-1">🚨 FLAGGED</span>
+            {% endif %}
+          </td>
+
+          <td class="text-center num font-medium">{{ r.total_orders if r.total_orders else "—" }}</td>
+          <td class="text-center num font-bold {% if r.unique_orders > 0 %}text-red-600{% endif %}">{{ r.unique_orders }}</td>
+
+          <td class="text-center">
+            {% if r.return_rate is not none %}
+            <span class="inline-block px-2 py-1 rounded-lg text-xs font-bold num
+              {% if r.cohort_flagged %}bg-red-100 text-red-700 border border-red-300
+              {% elif r.return_rate > cohort_avg %}bg-orange-50 text-orange-600
+              {% else %}bg-green-50 text-green-700{% endif %}">
+              {{ r.return_rate }}%
+            </span>
+            {% else %}
+            <span class="text-brand-sage text-xs">No order data</span>
+            {% endif %}
+          </td>
+
+          <td class="text-center">
+            {% if r.above_avg_multiple > 0 %}
+            <span class="num font-bold text-sm
+              {% if r.above_avg_multiple >= 2 %}text-red-600
+              {% elif r.above_avg_multiple >= 1.5 %}text-orange-500
+              {% else %}text-brand-sage{% endif %}">
+              {{ r.above_avg_multiple }}x
+            </span>
+            {% else %}—{% endif %}
+          </td>
+
           <td class="text-center num">{{ r.unique_buyers }}</td>
-          <td class="text-center font-bold num">{{ r.unique_orders }}</td>
           <td class="text-right num">${{ "%.2f"|format(r.total_refund) }}</td>
-          <td class="text-right num font-bold text-red-600">
+          <td class="text-right num font-bold {% if r.total_commission > 0 %}text-orange-600{% endif %}">
             ${{ "%.2f"|format(r.total_commission) }}
           </td>
+
           <td class="text-center">
-            <span
-              class="inline-block px-2 py-1 rounded text-xs font-bold num badge-{{ 'critical' if r.max_score >= 60 else 'high' if r.max_score >= 40 else 'medium' if r.max_score >= 20 else 'low' }}"
-              >{{ r.max_score }}</span
-            >
+            <span class="inline-block px-2 py-1 rounded text-xs font-bold num badge-{{ 'critical' if r.max_score >= 60 else 'high' if r.max_score >= 40 else 'medium' if r.max_score >= 20 else 'low' }}">
+              {{ r.max_score }}
+            </span>
           </td>
-          <td class="text-center num">{{ r.avg_score }}</td>
+          <td class="text-center num text-xs text-brand-sage">{{ r.avg_score }}</td>
+
           <td class="text-xs">
-            {% if r.has_self_buy %}
-            <span class="flag-tag flag-red">SELF-BUY</span>
-            {% endif %} {% if r.return_count > r.unique_orders %}
-            <span class="flag-tag flag-orange">DUPLICATE RETURNS</span>
+            {% if r.cohort_flagged %}<span class="flag-tag flag-red">2x AVG RATE</span>{% endif %}
+            {% if r.has_self_buy %}<span class="flag-tag flag-red">SELF-BUY</span>{% endif %}
+            {% if r.return_count > r.unique_orders %}<span class="flag-tag flag-orange">DUPE RETURNS</span>{% endif %}
+            {% if not r.cohort_flagged and not r.has_self_buy and r.return_count <= r.unique_orders %}
+            <span class="text-brand-sage text-xs">—</span>
             {% endif %}
           </td>
+
           <td class="text-xs">
             {% if r.commission_paid == 'YES' %}
-            <span class="font-bold text-red-600">YES — AT RISK</span>
+            <span class="font-bold text-red-600">YES — money already out</span>
             {% else %}
-            <span class="text-brand-green">No</span>
+            <span class="text-brand-green font-medium">Not yet</span>
             {% endif %}
           </td>
+
           <td class="text-xs text-brand-sage">
-            {% for b in (r.buyers or '').split(',')[:3] if b %}
+            {% for b in (r.buyers or '').split(',')[:4] if b %}
             <span class="block">@{{ b.strip() }}</span>
             {% endfor %}
+            {% if (r.buyers or '').split(',')|length > 4 %}
+            <span class="text-brand-sage/60">+{{ (r.buyers or '').split(',')|length - 4 }} more</span>
+            {% endif %}
           </td>
+
+          <td class="text-xs text-brand-sage">{{ (r.states or '').replace(',', ', ') }}</td>
+
           <td class="text-xs text-brand-sage">
-            {{ (r.states or '').replace(',', ', ') }}
-          </td>
-          <td class="text-xs text-brand-sage">
-            {% for reason in (r.reasons or '').split(',')[:2] %}
+            {% for reason in (r.reasons or '').split(',')[:3] if reason.strip() %}
             <span class="block">{{ reason.strip() }}</span>
             {% endfor %}
           </td>
@@ -98,4 +265,9 @@ endblock %} {% block content %}
     </table>
   </div>
 </div>
+
+{% else %}
+<div class="p-12 text-center text-brand-sage">No creator data for this run.</div>
+{% endif %}
+
 {% endblock %}

@@ -137,6 +137,56 @@ endblock %} {% block content %}
   </div>
 </div>
 
+<!-- CREATOR COHORT FLAGS -->
+{% set creator_avg = data.creator_bench.avg_refund_pct | replace('%','') | float %}
+{% set threshold = creator_avg * 2 %}
+{% set flagged = [] %}
+{% for c in data.creators_with_returns %}
+  {% set rate = c.return_pct | replace('%','') | float %}
+  {% if rate > threshold and c.returns >= 2 %}
+    {% if flagged.append(c) %}{% endif %}
+  {% endif %}
+{% endfor %}
+
+{% if flagged %}
+<div class="card border-2 border-red-400 bg-red-50 shadow-md mb-8">
+  <div class="card-body p-5">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="text-2xl">🚨</span>
+      <div>
+        <h2 class="font-bold text-red-700 text-lg">{{ flagged|length }} Creator{% if flagged|length > 1 %}s{% endif %} Above 2x Cohort Average Return Rate</h2>
+        <p class="text-sm text-red-600">
+          Cohort average is <strong>{{ data.creator_bench.avg_refund_pct }}</strong>.
+          Flag threshold is <strong>{{ threshold | round(1) }}%</strong>.
+          These creators need immediate review — their audiences are returning at an abnormally high rate.
+        </p>
+      </div>
+      <a href="/creator-data/{{ run.id }}" class="btn btn-error btn-sm ml-auto">Full Creator Analysis →</a>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      {% for c in flagged %}
+      <div class="bg-white rounded-xl border border-red-200 p-4">
+        <div class="flex justify-between items-start mb-2">
+          <span class="font-bold text-red-700 text-base">@{{ c.username }}</span>
+          <span class="badge badge-error num">{{ c.return_pct }}</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div><span class="text-brand-sage">Orders:</span> <span class="num font-bold">{{ c.orders }}</span></div>
+          <div><span class="text-brand-sage">Returns:</span> <span class="num font-bold text-red-600">{{ c.returns }}</span></div>
+          <div><span class="text-brand-sage">Cohort avg:</span> <span class="num">{{ data.creator_bench.avg_refund_pct }}</span></div>
+          <div><span class="text-brand-sage">Times above:</span>
+            <span class="num font-bold text-red-600">
+              {{ ((c.return_pct | replace('%','') | float) / (data.creator_bench.avg_refund_pct | replace('%','') | float)) | round(1) }}x
+            </span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- DAILY TRACKER CHART -->
 <div class="card bg-base-100 shadow-sm border border-base-300 p-6 mb-8">
   <h3 class="section-label mb-4">Daily Order & Return Tracker</h3>

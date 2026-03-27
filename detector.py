@@ -9,7 +9,7 @@ from datetime import datetime
 from collections import defaultdict
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-COMMISSION_HOLD_DAYS = 14
+COMMISSION_HOLD_DAYS = 30
 PRODUCT_KEYWORDS = ["liposomal magnesium", "magnesium + ashwagandha", "magnesium+ashwagandha", "magasha"]
 
 WEIGHTS = {
@@ -719,7 +719,7 @@ def _score_returns(mag_returns, lookups):
             elif days_since_delivery > COMMISSION_HOLD_DAYS:
                 score += WEIGHTS["return_after_commission"]
                 flags.append(f"Return {days_since_delivery}d after delivery (AFTER {COMMISSION_HOLD_DAYS}d window)")
-            elif days_since_delivery >= 12:
+            elif days_since_delivery >= 25:
                 score += WEIGHTS["return_near_commission_window"]
                 flags.append(f"Return {days_since_delivery}d after delivery (near commission window)")
 

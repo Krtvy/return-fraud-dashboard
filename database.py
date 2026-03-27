@@ -509,8 +509,47 @@ def get_creator_aggregation(run_id):
         GROUP BY creator
         ORDER BY total_commission DESC, max_score DESC
     """, (run_id,)).fetchall()
+    rows = [dict(r) for r in rows]
+
+    # Pull creator order totals from overview_data JSON
+    overview_row = conn.execute(
+        "SELECT data_json FROM overview_data WHERE run_id = ?", (run_id,)
+    ).fetchone()
     conn.close()
-    return [dict(r) for r in rows]
+
+    creator_order_map = {}
+    if overview_row:
+        import json as _json
+        overview = _json.loads(overview_row["data_json"])
+        for c in overview.get("creators", []):
+            creator_order_map[c["username"]] = c["orders"]
+
+    # Compute return rate per creator
+    for r in rows:
+        total_orders = creator_order_map.get(r["creator"], 0)
+        r["total_orders"] = total_orders
+        if total_orders > 0:
+            r["return_rate"] = round(r["unique_orders"] / total_orders * 100, 1)
+        else:
+            r["return_rate"] = None
+
+    # Cohort average (only creators with known order counts)
+    rates = [r["return_rate"] for r in rows if r["return_rate"] is not None]
+    cohort_avg = round(sum(rates) / len(rates), 1) if rates else 0
+
+    # Flag creators above 2x cohort average with at least 2 returns
+    for r in rows:
+        if r["return_rate"] is not None and cohort_avg > 0:
+            r["above_avg_multiple"] = round(r["return_rate"] / cohort_avg, 1)
+            r["cohort_flagged"] = r["return_rate"] > cohort_avg * 2 and r["unique_orders"] >= 2
+        else:
+            r["above_avg_multiple"] = 0
+            r["cohort_flagged"] = False
+        r["cohort_avg"] = cohort_avg
+
+    # Flagged creators first, then sorted by return rate
+    rows.sort(key=lambda x: (not x["cohort_flagged"], -(x["return_rate"] or 0)))
+    return rows
 
 
 def save_overview(run_id, overview_data):
