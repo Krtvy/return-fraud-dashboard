@@ -133,14 +133,15 @@ def read_csv_robust(filepath):
 
 
 # ─── OVERVIEW — computed from raw CSVs ───────────────────────────────────────
-def parse_overview_data(return_raw_path, affiliate_raw_path, all_orders_raw_path):
+def parse_overview_data(return_raw_path, affiliate_raw_path, all_orders_raw_path,
+                        _returns=None, _affiliates=None, _orders=None):
     """Compute top-down overview from the 3 raw TikTok CSVs.
-    Always reflects the latest data in those files."""
+    Accepts pre-loaded data to avoid re-reading files if already loaded."""
     overview = {}
 
-    returns = read_csv_robust(return_raw_path)
-    affiliates = read_csv_robust(affiliate_raw_path)
-    orders = read_csv_robust(all_orders_raw_path)
+    returns = _returns if _returns is not None else read_csv_robust(return_raw_path)
+    affiliates = _affiliates if _affiliates is not None else read_csv_robust(affiliate_raw_path)
+    orders = _orders if _orders is not None else read_csv_robust(all_orders_raw_path)
 
     # Filter to MagAsha
     mag_returns = [r for r in returns if is_target_product(r.get("Product Name", ""))]
@@ -428,7 +429,7 @@ def run_detection(return_raw_path, affiliate_raw_path, all_orders_raw_path):
         )),
     }
 
-    return results, stats, daily_stats
+    return results, stats, daily_stats, returns, affiliates, orders
 
 
 def _build_lookups(returns, affiliates, orders, mag_returns, mag_affiliates, mag_orders):

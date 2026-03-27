@@ -62,17 +62,21 @@ def upload():
         paths[key] = path
 
     try:
-        results, stats, daily_stats = detector.run_detection(
+        # Load CSVs once, pass to both functions to avoid double file reads
+        results, stats, daily_stats, raw_returns, raw_affiliates, raw_orders = detector.run_detection(
             paths["return_raw"],
             paths["affiliate_raw"],
             paths["all_orders_raw"],
         )
 
-        # Compute overview from the uploaded raw CSVs
+        # Pass pre-loaded data so files are not read again
         overview_data = detector.parse_overview_data(
             paths["return_raw"],
             paths["affiliate_raw"],
             paths["all_orders_raw"],
+            _returns=raw_returns,
+            _affiliates=raw_affiliates,
+            _orders=raw_orders,
         )
 
         run_id = db.save_run(stats)
