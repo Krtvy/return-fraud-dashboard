@@ -394,21 +394,6 @@ def get_creator_profiles():
     return [dict(r) for r in rows]
 
 
-def get_action_log(run_id=None):
-    conn = get_db()
-    if run_id:
-        rows = conn.execute(
-            "SELECT * FROM action_log WHERE run_id = ? ORDER BY action_date DESC",
-            (run_id,)
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM action_log ORDER BY action_date DESC LIMIT 100"
-        ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
 def save_daily_stats(run_id, daily_stats):
     conn = get_db()
     c = conn.cursor()
