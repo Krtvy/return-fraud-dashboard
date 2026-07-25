@@ -5,7 +5,6 @@ Detection runs in the browser (JS). Server only saves results and serves pages.
 
 import os
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
-from datetime import datetime
 
 import database as db
 
